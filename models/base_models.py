@@ -102,7 +102,7 @@ class BaseModel:
         return columns
 
     @classmethod
-    def create_table(cls) -> None:
+    def create_table_query(cls) -> str:
         """Creates the SQL query to create the database table of the model.
 
         Returns:
@@ -138,6 +138,12 @@ class BaseModel:
                 )
 
         query = f"{query}{keys}\n);"
+        return query
+
+    @classmethod
+    def create_table(cls) -> None:
+        """Creates the model table in database"""
+        query = cls.create_table_query()
         try:
             cls.db_obj.execute(query)
         except dbError as err:

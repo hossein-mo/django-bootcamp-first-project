@@ -1,5 +1,11 @@
+import os
+import sys
 from enum import Enum
-from typing import Union, Any, List
+from typing import Union, Any, List, Dict
+from mysql.connector import Error as dbError
+
+sys.path.append(os.path.dirname(os.path.dirname(__file__)))
+from database import DatabaseConnection
 
 
 class Column:
@@ -29,9 +35,9 @@ class Column:
             auto_increment (bool, optional): Sets the auto increment feature for column. Mainly used for id columns.\
                  When set to True the equivalent attribute to this column will not be inserted into database.  \
                     Defaults to False.
-            foreign_key (Union[None, &quot;Column&quot;], optional): None for no foreign key \
+            foreign_key (Union[None, str], optional): None for no foreign key \
                 or the name of the referenced column. Defaults to False.
-            reference (Union[None, &quot;BaseModel&quot;], optional): None for no foreign key \
+            reference (Union[None, str], optional): None for no foreign key \
                 or the name of the referenced table. Defaults to False.
             default (Any, optional): Default value of the column or None for no default value. Defaults to None.
             as_string (bool, optional): If set to True values of this column will be passed to \
@@ -74,16 +80,24 @@ class Column:
         """
         return self.name
 
+    def __hash__(self) -> hash:
+        return hash(self.name)
+
 
 class BaseModel:
     name: str
+    db_obj = DatabaseConnection()
 
     @classmethod
-    def get_columns(cls) -> list:
+    def create_new(cls, **kwargs):
+        return cls(**kwargs)
+
+    @classmethod
+    def get_columns(cls) -> List[Column]:
         """Create a list of class attributes that are instances of Column class.
 
         Returns:
-            list: List of column instances.
+            List[Column]: List of column instances.
         """
         columns = []
         for _, column in vars(cls).items():
@@ -91,10 +105,23 @@ class BaseModel:
                 columns.append(column)
         return columns
 
-    # right now create_table() return the query in string, this will be edited later on to execute query on database using database object.
     @classmethod
-    def create_table(cls) -> str:
-        """Creates the SQL query to create the database table of the model. \
+    def get_primary_keys(cls) -> List[Column]:
+        """Return list of primary key columns
+
+        Returns:
+            List[Column]: list of primary keys
+        """
+        columns = cls.get_columns()
+        pk = []
+        for column in columns:
+            if column.primary_key:
+                pk.append(column)
+        return pk
+
+    @classmethod
+    def create_table_query(cls) -> str:
+        """Creates the SQL query to create the database table of the model.
 
         Returns:
             str: Create table query.
@@ -110,8 +137,8 @@ class BaseModel:
                 primary_keys.append(column.name)
             elif column.foreign_key:
                 foreign_keys[column.name] = [
-                    column.reference.name,
-                    column.foreign_key.name,
+                    column.reference,
+                    column.foreign_key,
                 ]
             if column.unique:
                 unique_keys.append(column.name)
@@ -124,15 +151,84 @@ class BaseModel:
         if foreign_keys:
             for key in foreign_keys:
                 keys = (
-                    f"{keys},\nCONSTRAINT {cls.name}_{foreign_keys[key][1]}_FK "
+                    f"{keys},\nCONSTRAINT {cls.name}_{foreign_keys[key][0]}_{foreign_keys[key][1]}_FK "
                     f"FOREIGN KEY ({key}) REFERENCES {foreign_keys[key][0]} ({foreign_keys[key][1]})"
                 )
 
         query = f"{query}{keys}\n);"
         return query
 
+    @classmethod
+    def create_table(cls) -> None:
+        """Creates the model table in database"""
+        query = cls.create_table_query()
+        try:
+            cls.db_obj.execute(query)
+        except dbError as err:
+            print(f'Error while creating "{cls.name}" table.')
+            print(f"Error description: {err}")
+
+    @classmethod
+    def fetch(
+        cls,
+        select: str = "*",
+        where: str = None,
+        order_by: str = None,
+        descending: bool = False,
+        limit: int = None,
+        offset: int = None,
+    ) -> dict:
+        """Executes select query in the table of model instance.
+
+        Returns:
+            dict: List of fetched rows as dictionary of selected columns
+        """
+        query = f'SELECT {",".join(select)} FROM {cls.name}'
+        if where:
+            query = f"{query} WHERE {where}"
+        if order_by:
+            query = f"{query} ORDER BY {order_by}"
+            if descending:
+                query = f"{query} DESC"
+        if limit:
+            query = f"{query} LIMIT {limit}"
+        if offset:
+            query = f"{query} OFFSET {offset}"
+        try:
+            results = cls.db_obj.fetch(query)
+        except dbError as err:
+            print(f'Error while fetching from "{cls.name}".')
+            print(f"Error description: {err}")
+            return {}
+        else:
+            return results
+
+    @classmethod
+    def fetch_obj(
+        cls,
+        where: str = None,
+        order_by: str = None,
+        descending: bool = False,
+        limit: int = None,
+        offset: int = None,
+    ) -> List["BaseModel"]:
+        """Executes select query in the table of model instance.
+
+        Returns:
+            "BaseModel": List of fetched rows as instances of the class
+        """
+        results = cls.fetch(
+            select="*",
+            where=where,
+            order_by=order_by,
+            descending=descending,
+            limit=limit,
+            offset=offset,
+        )
+        return [cls(**item) for item in results]
+
     def get_comma_seperated(self, columns: List[Column]) -> str:
-        """Get the value of model as a comma seperated string
+        """Get value of instance attributes as a comma seperated string
 
         Args:
             columns (List[Column]): list of column o return their values
@@ -153,26 +249,83 @@ class BaseModel:
                 values = f"{values}{v},"
         return values
 
-    # right now insert() return the query in string, this will be edited later on to execute query on database using database object.
-    def insert(self) -> str:
-        """Creates insert query for the model instance.
+    def insert(self) -> None:
+        """Executes insert in the table of model instance.
 
         Returns:
-            str: insert query
+            None
         """
         cls = self.__class__
-        columns = cls.get_columns()
+        columns = []
+        set_from_db = None
+        for column in cls.get_columns():
+            if not column.auto_increment:
+                columns.append(column)
+            else:
+                set_from_db = column
         columns = [column for column in columns if not column.auto_increment]
         column_names = [column.name for column in columns]
-        values = self.get_comma_seperated(columns)
         clm = ", ".join(tuple(column_names))
+        values = self.get_comma_seperated(columns)
         query = f"INSERT INTO {cls.name} ({clm})\nVALUES ({values[:-1]});"
-        return query
+        try:
+            _, rowid = self.db_obj.execute(query)
+        except dbError as err:
+            print(f'Error while inserting new row into "{cls.name}".')
+            print(f"Error description: {err}")
+        else:
+            if set_from_db:
+                self.__dict__[set_from_db.name] = rowid
 
-    # to be implemented
-    @classmethod
-    def fetch(cls, select="*", where=None, order_by=None, limit=None, offset=None):
-        pass
+    def update_query(self, colval: Dict[Column, Any], where: str = "default") -> str:
+        """Generates the query for updating with specified inputs
+
+        Args:
+            colval (Dict[Column, Any]): A dictionary where keys are Column to update and \
+                its value is the new value of the column.
+            where (str, optional): Condition for updating if equal to 'default' \
+                it will generate update query based on primary keys. Defaults to "default".
+
+        Returns:
+            str: query for updating
+        """
+        query = f"UPDATE {self.name} SET"
+        for column in colval:
+            query = f'{query} {column.name} = "{colval[column]}",'
+        query = f"{query[:-1]} WHERE"
+        if where == "default":
+            cls = self.__class__
+            obj_dict = self.__dict__
+            pks = cls.get_primary_keys()
+            for pk in pks:
+                query = f'{query} {pk.name}="{obj_dict[pk.name]}" AND'
+            query = f"{query[:-4]};"
+            return query
+        else:
+            query = f"{query} {where}"
+            return query
+
+    def update(self, colval: Dict[Column, Any], where: str = "default") -> int:
+        """Update row(s) with specified inputs
+
+        Args:
+            colval (Dict[Column, Any]): A dictionary where keys are Column to update and \
+                its value is the new value of the column.
+            where (str, optional): Condition for updating if equal to 'default' \
+                it will generate update query based on primary keys. Defaults to "default".
+
+        Returns:
+            int: number of rows affected.
+        """
+        query = self.update_query(colval, where)
+        try:
+            rowcount, _ = self.db_obj.execute(query)
+        except dbError as err:
+            print(f'Error updating "{self.name}".')
+            print(f"Error description: {err}")
+            return 0
+        else:
+            return rowcount
 
 
 class UserRole(Enum):

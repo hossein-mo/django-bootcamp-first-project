@@ -12,8 +12,8 @@ class DatabaseConnection(metaclass=SingletonMeta):
     HOST = "localhost"
     PORT = "3307"
     USER = "root"
-    password = "pass"
-    db_name = "pytonilia_db"
+    PASSWORD = "pass"
+    DB_NAME = "pytonilia_db"
     POOL_SIZE = 5
 
     def create_db_if_not_exist(self, db_config: dict) -> None:

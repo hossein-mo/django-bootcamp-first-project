@@ -1,5 +1,8 @@
 from enum import Enum
-from typing import Union, Any, List
+from typing import Union, Any, List, Tuple
+import mysql.connector
+
+from models.database import DatabaseConnection
 
 
 class Column:
@@ -93,9 +96,9 @@ class BaseModel:
 
     # right now create_table() return the query in string, this will be edited later on to execute query on database using database object.
     @classmethod
-    def create_table(cls) -> str:
-        """Creates the SQL query to create the database table of the model. \
-
+    def create_table(cls) -> None:
+        """Creates the SQL query to create the database table of the model.
+        
         Returns:
             str: Create table query.
         """
@@ -110,8 +113,8 @@ class BaseModel:
                 primary_keys.append(column.name)
             elif column.foreign_key:
                 foreign_keys[column.name] = [
-                    column.reference.name,
-                    column.foreign_key.name,
+                    column.reference,
+                    column.foreign_key,
                 ]
             if column.unique:
                 unique_keys.append(column.name)
@@ -129,7 +132,9 @@ class BaseModel:
                 )
 
         query = f"{query}{keys}\n);"
-        return query
+        conn = DatabaseConnection.get_connection()
+        cursor = conn.cursor()
+        cursor.execute(query)
 
     def get_comma_seperated(self, columns: List[Column]) -> str:
         """Get the value of model as a comma seperated string
@@ -154,25 +159,52 @@ class BaseModel:
         return values
 
     # right now insert() return the query in string, this will be edited later on to execute query on database using database object.
-    def insert(self) -> str:
-        """Creates insert query for the model instance.
+    def insert(self) -> None:
+        """Executes insert in the table of model instance.
 
         Returns:
-            str: insert query
+            None
         """
         cls = self.__class__
         columns = cls.get_columns()
         columns = [column for column in columns if not column.auto_increment]
         column_names = [column.name for column in columns]
-        values = self.get_comma_seperated(columns)
         clm = ", ".join(tuple(column_names))
+        values = self.get_comma_seperated(columns)
         query = f"INSERT INTO {cls.name} ({clm})\nVALUES ({values[:-1]});"
-        return query
+        conn = DatabaseConnection.get_connection()
+        conn.cursor().execute(query)
+        conn.commit()
 
-    # to be implemented
+    
     @classmethod
-    def fetch(cls, select="*", where=None, order_by=None, limit=None, offset=None):
-        pass
+    def fetch(cls, select:Tuple[str]=('*',), where:str=None, order_by:List[Tuple[str,bool]]=None, limit:int=None, offset:int=None) -> List[Tuple]:
+        """Executes select query in the table of model instance.
+
+        Returns:
+            list: List of fetched rows as tuple of selected columns
+        """
+        query = f'SELECT {",".join(select)} FROM {cls.name}'
+        if where:
+            query = f'{query} WHERE {where}'
+        if order_by:
+            orders = ",".join([f'{order[0]} {"ASC" if order[1] else "DESC"}' for order in order_by])
+            query = f'{query} ORDER BY {orders}'
+        if limit:
+            query = f'{query} LIMIT {limit}'
+        if offset:
+            query = f'{query} OFFSET {offset}'
+        conn = DatabaseConnection.get_connection()
+        cursor = conn.cursor()
+        cursor.execute(query)
+        rows = cursor.fetchall()
+        print(cursor.rowcount)
+        if select[0]=='*':
+            columns = [column[0] for column in cursor.description]
+            results = [dict(zip(columns, row)) for row in rows]
+            return [cls(**item) for item in results]
+        return rows
+        
 
 
 class UserRole(Enum):
@@ -188,3 +220,4 @@ class UserRole(Enum):
             str: comma seperated string
         """
         return ", ".join([f"'{role.value}'" for role in cls])
+    

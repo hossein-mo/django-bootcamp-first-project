@@ -98,7 +98,7 @@ class BaseModel:
     @classmethod
     def create_table(cls) -> None:
         """Creates the SQL query to create the database table of the model.
-        
+
         Returns:
             str: Create table query.
         """
@@ -127,7 +127,7 @@ class BaseModel:
         if foreign_keys:
             for key in foreign_keys:
                 keys = (
-                    f"{keys},\nCONSTRAINT {cls.name}_{foreign_keys[key][1]}_FK "
+                    f"{keys},\nCONSTRAINT {cls.name}_{foreign_keys[key][0]}_{foreign_keys[key][1]}_FK "
                     f"FOREIGN KEY ({key}) REFERENCES {foreign_keys[key][0]} ({foreign_keys[key][1]})"
                 )
 
@@ -176,9 +176,15 @@ class BaseModel:
         conn.cursor().execute(query)
         conn.commit()
 
-    
     @classmethod
-    def fetch(cls, select:Tuple[str]=('*',), where:str=None, order_by:List[Tuple[str,bool]]=None, limit:int=None, offset:int=None) -> List[Tuple]:
+    def fetch(
+        cls,
+        select: Tuple[str] = ("*",),
+        where: str = None,
+        order_by: List[Tuple[str, bool]] = None,
+        limit: int = None,
+        offset: int = None,
+    ) -> List[Tuple]:
         """Executes select query in the table of model instance.
 
         Returns:
@@ -186,25 +192,26 @@ class BaseModel:
         """
         query = f'SELECT {",".join(select)} FROM {cls.name}'
         if where:
-            query = f'{query} WHERE {where}'
+            query = f"{query} WHERE {where}"
         if order_by:
-            orders = ",".join([f'{order[0]} {"ASC" if order[1] else "DESC"}' for order in order_by])
-            query = f'{query} ORDER BY {orders}'
+            orders = ",".join(
+                [f'{order[0]} {"ASC" if order[1] else "DESC"}' for order in order_by]
+            )
+            query = f"{query} ORDER BY {orders}"
         if limit:
-            query = f'{query} LIMIT {limit}'
+            query = f"{query} LIMIT {limit}"
         if offset:
-            query = f'{query} OFFSET {offset}'
+            query = f"{query} OFFSET {offset}"
         conn = DatabaseConnection.get_connection()
         cursor = conn.cursor()
         cursor.execute(query)
         rows = cursor.fetchall()
         print(cursor.rowcount)
-        if select[0]=='*':
+        if select[0] == "*":
             columns = [column[0] for column in cursor.description]
             results = [dict(zip(columns, row)) for row in rows]
             return [cls(**item) for item in results]
         return rows
-        
 
 
 class UserRole(Enum):
@@ -220,4 +227,3 @@ class UserRole(Enum):
             str: comma seperated string
         """
         return ", ".join([f"'{role.value}'" for role in cls])
-    

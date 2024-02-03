@@ -1,68 +1,66 @@
 import mysql.connector
+import os
+import sys
+from mysql.connector import pooling
 
-class DatabaseConnection:
+sys.path.append(os.path.dirname(os.path.dirname(__file__)))
+from meta import SingletonMeta
+
+
+class DatabaseConnection(metaclass=SingletonMeta):
     _instance = None
-    host='localhost'
-    user ='root'
-    password =''
-    db_name = 'pytonilia_db'
+    host = "localhost"
+    port = "3306"
+    user = "root"
+    password = "pass"
+    db_name = "pytonilia_db"
+    pool_size = 5
 
-    # def __new__(cls, *args, **kwargs):
-    #     if not cls._instance:
-    #         cls._instance = super(DatabaseConnection, cls).__new__(cls, *args, **kwargs)
-    #         cls._instance.connection = mysql.connector.connect(
-    #             host= cls.host,
-    #             user= cls.user,
-    #             password= cls.password,
-    #             database=cls.db_name
-    #         )
-    #     return cls._instance
-    
-    @classmethod
-    def get_connection(cls):
-        """Create a database if not exist and return the connection."""
+    def create_db_if_not_exist(self, db_config: dict) -> None:
+        with mysql.connector.connect(**db_config) as connection:
+            cursor = connection.cursor()
+            cursor.execute(f'SHOW DATABASES LIKE "{self.db_name}";')
+            database_exists = cursor.fetchone()
+            if not database_exists:
+                cursor.execute(f"CREATE DATABASE {self.db_name};")
+            connection.commit()
+            cursor.close()
+
+    def __init__(self) -> None:
+        self.__dbconfig = {
+            "host": self.host,
+            "port": self.port,
+            "user": self.user,
+            "password": self.password,
+        }
         try:
-            connection = mysql.connector.connect(
-                host= DatabaseConnection.host,
-                user=DatabaseConnection.user,
-                password=DatabaseConnection.password,
-                database=DatabaseConnection.db_name
+            self.create_db_if_not_exist(self.__dbconfig)
+        except mysql.connector.Error as err:
+            print(f"Error: {err}")
+        else:
+            self.__dbconfig["database"] = self.db_name
+            self.pool = pooling.MySQLConnectionPool(
+                pool_size=self.pool_size, pool_reset_session=True, **self.__dbconfig
             )
-            return connection
 
-        except mysql.connector.Error as e:
-            if e.errno == mysql.connector.errorcode.ER_BAD_DB_ERROR:
-                # Database does not exist, create it
-                connection = mysql.connector.connect(
-                    host=DatabaseConnection.host,
-                    user=DatabaseConnection.user,
-                    password=DatabaseConnection.password
-                )
+    def update(self, query: str) -> int:
+        connection = self.pool.get_connection()
+        cursor = connection.cursor(dictionary=True)
+        cursor.execute(query)
+        connection.commit()
+        rowscount = cursor.rowcount
+        cursor.close()
+        connection.close()
+        return rowscount
 
-                cursor = connection.cursor()
-                cursor.execute(f'CREATE DATABASE {DatabaseConnection.db_name} COLLATE utf8_persian_ci')
-                from models.user import User
-                User.create_table()
-                from models.bank_account import BankAccount
-                BankAccount.create_table()
-                from models.movie import Movie
-                Movie.create_table()
-                # from models.comment import Comment
-                # Comment.create_table()
-                from models.subscription import Subscription
-                Subscription.create_table()
-                # from models.user_subscription import UserSubscription
-                # UserSubscription.create_table()
-                cursor.close()
+    def execute(self, query: str) -> None:
+        self.update(query)
 
-                connection = mysql.connector.connect(
-                    host=DatabaseConnection.host,
-                    user=DatabaseConnection.user,
-                    password=DatabaseConnection.password,
-                    database=DatabaseConnection.db_name
-                )
-
-                return connection
-
-            else:
-                print("Error while connecting to MySQL", e)
+    def fetch(self, query: str) -> list:
+        connection = self.pool.get_connection()
+        cursor = connection.cursor(dictionary=True)
+        cursor.execute(query)
+        result = cursor.fetchall()
+        cursor.close()
+        connection.close()
+        return result

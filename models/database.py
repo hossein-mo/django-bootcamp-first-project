@@ -8,7 +8,6 @@ from meta import SingletonMeta
 
 
 class DatabaseConnection(metaclass=SingletonMeta):
-    _instance = None
     host = "localhost"
     port = "3306"
     user = "root"

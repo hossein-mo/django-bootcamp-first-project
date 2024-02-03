@@ -89,17 +89,31 @@ class BaseModel:
     db_obj = DatabaseConnection()
 
     @classmethod
-    def get_columns(cls) -> list:
+    def get_columns(cls) -> List[Column]:
         """Create a list of class attributes that are instances of Column class.
 
         Returns:
-            list: List of column instances.
+            List[Column]: List of column instances.
         """
         columns = []
         for _, column in vars(cls).items():
             if isinstance(column, Column):
                 columns.append(column)
         return columns
+
+    @classmethod
+    def get_primary_keys(cls) -> List[Column]:
+        """Return list of primary key columns
+
+        Returns:
+            List[Column]: list of primary keys
+        """
+        columns = cls.get_columns()
+        pk = []
+        for column in columns:
+            if column.primary_key:
+                pk.append(column)
+        return pk
 
     @classmethod
     def create_table_query(cls) -> str:
@@ -148,47 +162,6 @@ class BaseModel:
             cls.db_obj.execute(query)
         except dbError as err:
             print(f'Error while creating "{cls.name}" table.')
-            print(f"Error description: {err}")
-
-    def get_comma_seperated(self, columns: List[Column]) -> str:
-        """Get the value of model as a comma seperated string
-
-        Args:
-            columns (List[Column]): list of column o return their values
-
-        Returns:
-            str: comma seperated string
-        """
-        obj_dict = self.__dict__
-        values = ""
-        for column in columns:
-            if isinstance(obj_dict[column.name], Enum):
-                v = obj_dict[column.name].value
-            else:
-                v = obj_dict[column.name]
-            if column.as_string:
-                values = f'{values}"{v}",'
-            else:
-                values = f"{values}{v},"
-        return values
-
-    def insert(self) -> None:
-        """Executes insert in the table of model instance.
-
-        Returns:
-            None
-        """
-        cls = self.__class__
-        columns = cls.get_columns()
-        columns = [column for column in columns if not column.auto_increment]
-        column_names = [column.name for column in columns]
-        clm = ", ".join(tuple(column_names))
-        values = self.get_comma_seperated(columns)
-        query = f"INSERT INTO {cls.name} ({clm})\nVALUES ({values[:-1]});"
-        try:
-            self.db_obj.execute(query)
-        except dbError as err:
-            print(f'Error while inserting new row into "{cls.name}".')
             print(f"Error description: {err}")
 
     @classmethod
@@ -249,6 +222,79 @@ class BaseModel:
             offset=offset,
         )
         return [cls(**item) for item in results]
+
+    def get_comma_seperated(self, columns: List[Column]) -> str:
+        """Get the value of model as a comma seperated string
+
+        Args:
+            columns (List[Column]): list of column o return their values
+
+        Returns:
+            str: comma seperated string
+        """
+        obj_dict = self.__dict__
+        values = ""
+        for column in columns:
+            if isinstance(obj_dict[column.name], Enum):
+                v = obj_dict[column.name].value
+            else:
+                v = obj_dict[column.name]
+            if column.as_string:
+                values = f'{values}"{v}",'
+            else:
+                values = f"{values}{v},"
+        return values
+
+    def insert(self) -> None:
+        """Executes insert in the table of model instance.
+
+        Returns:
+            None
+        """
+        cls = self.__class__
+        columns = []
+        set_from_db = None
+        for column in cls.get_columns():
+            if not column.auto_increment:
+                columns.append(column)
+            else:
+                set_from_db = column
+        columns = [column for column in columns if not column.auto_increment]
+        column_names = [column.name for column in columns]
+        clm = ", ".join(tuple(column_names))
+        values = self.get_comma_seperated(columns)
+        query = f"INSERT INTO {cls.name} ({clm})\nVALUES ({values[:-1]});"
+        try:
+            _, rowid = self.db_obj.execute(query)
+        except dbError as err:
+            print(f'Error while inserting new row into "{cls.name}".')
+            print(f"Error description: {err}")
+        else:
+            if set_from_db:
+                self.__dict__[set_from_db.name] = rowid
+
+    def update(self, colval: Dict[Column, Any], where: str = "default") -> int:
+        query = f"UPDATE {self.name} SET"
+        for column in colval:
+            query = f'{query} {column.name} = "{colval[column]}",'
+        query = f"{query[:-1]} WHERE"
+        if where == "default":
+            cls = self.__class__
+            obj_dict = self.__dict__
+            pks = cls.get_primary_keys()
+            for pk in pks:
+                query = f'{query} {pk.name}="{obj_dict[pk.name]}" AND'
+            query = f"{query[:-4]};"
+        else:
+            query = f"{query} {where}"
+        try:
+            rowcount, _ = self.db_obj.execute(query)
+        except dbError as err:
+            print(f'Error updating "{cls.name}".')
+            print(f"Error description: {err}")
+            return 0
+        else:
+            return rowcount
 
 
 class UserRole(Enum):

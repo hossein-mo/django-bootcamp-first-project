@@ -9,12 +9,12 @@ from meta import SingletonMeta
 
 
 class DatabaseConnection(metaclass=SingletonMeta):
-    host = "localhost"
-    port = "3306"
-    user = "root"
+    HOST = "localhost"
+    PORT = "3307"
+    USER = "root"
     password = "pass"
     db_name = "pytonilia_db"
-    pool_size = 5
+    POOL_SIZE = 5
 
     def create_db_if_not_exist(self, db_config: dict) -> None:
         with mysql.connector.connect(**db_config) as connection:
@@ -26,12 +26,12 @@ class DatabaseConnection(metaclass=SingletonMeta):
             connection.commit()
             cursor.close()
 
-    def __init__(self) -> None:
+    def __init__(self, db_name=DB_NAME) -> None:
         self.__dbconfig = {
-            "host": self.host,
-            "port": self.port,
-            "user": self.user,
-            "password": self.password,
+            "host": self.HOST,
+            "port": self.PORT,
+            "user": self.USER,
+            "password": self.PASSWORD,
         }
         try:
             self.create_db_if_not_exist(self.__dbconfig)
@@ -40,18 +40,19 @@ class DatabaseConnection(metaclass=SingletonMeta):
         else:
             self.__dbconfig["database"] = self.db_name
             self.pool = pooling.MySQLConnectionPool(
-                pool_size=self.pool_size, pool_reset_session=True, **self.__dbconfig
+                pool_size=self.POOL_SIZE, pool_reset_session=True, **self.__dbconfig
             )
 
-    def execute(self, query: str) -> int:
+    def execute(self, query: str) -> List[int]:
         connection = self.pool.get_connection()
         cursor = connection.cursor(dictionary=True)
         cursor.execute(query)
         connection.commit()
         rowscount = cursor.rowcount
+        lastrowid = cursor.lastrowid
         cursor.close()
         connection.close()
-        return rowscount
+        return rowscount, lastrowid
 
     def fetch(self, query: str) -> list:
         connection = self.pool.get_connection()

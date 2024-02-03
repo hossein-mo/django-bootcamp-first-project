@@ -1,8 +1,11 @@
+import os
+import sys
 from enum import Enum
-from typing import Union, Any, List, Tuple
-import mysql.connector
+from typing import Union, Any, List, Dict
+from mysql.connector import Error as dbError
 
-from models.database import DatabaseConnection
+sys.path.append(os.path.dirname(os.path.dirname(__file__)))
+from database import DatabaseConnection
 
 
 class Column:
@@ -32,9 +35,9 @@ class Column:
             auto_increment (bool, optional): Sets the auto increment feature for column. Mainly used for id columns.\
                  When set to True the equivalent attribute to this column will not be inserted into database.  \
                     Defaults to False.
-            foreign_key (Union[None, &quot;Column&quot;], optional): None for no foreign key \
+            foreign_key (Union[None, str], optional): None for no foreign key \
                 or the name of the referenced column. Defaults to False.
-            reference (Union[None, &quot;BaseModel&quot;], optional): None for no foreign key \
+            reference (Union[None, str], optional): None for no foreign key \
                 or the name of the referenced table. Defaults to False.
             default (Any, optional): Default value of the column or None for no default value. Defaults to None.
             as_string (bool, optional): If set to True values of this column will be passed to \
@@ -77,9 +80,13 @@ class Column:
         """
         return self.name
 
+    def __hash__(self) -> hash:
+        return hash(self.name)
+
 
 class BaseModel:
     name: str
+    db_obj = DatabaseConnection()
 
     @classmethod
     def get_columns(cls) -> list:
@@ -94,7 +101,6 @@ class BaseModel:
                 columns.append(column)
         return columns
 
-    # right now create_table() return the query in string, this will be edited later on to execute query on database using database object.
     @classmethod
     def create_table(cls) -> None:
         """Creates the SQL query to create the database table of the model.
@@ -132,9 +138,11 @@ class BaseModel:
                 )
 
         query = f"{query}{keys}\n);"
-        conn = DatabaseConnection.get_connection()
-        cursor = conn.cursor()
-        cursor.execute(query)
+        try:
+            cls.db_obj.execute(query)
+        except dbError as err:
+            print(f'Error while creating "{cls.name}" table.')
+            print(f"Error description: {err}")
 
     def get_comma_seperated(self, columns: List[Column]) -> str:
         """Get the value of model as a comma seperated string
@@ -158,7 +166,6 @@ class BaseModel:
                 values = f"{values}{v},"
         return values
 
-    # right now insert() return the query in string, this will be edited later on to execute query on database using database object.
     def insert(self) -> None:
         """Executes insert in the table of model instance.
 
@@ -172,46 +179,70 @@ class BaseModel:
         clm = ", ".join(tuple(column_names))
         values = self.get_comma_seperated(columns)
         query = f"INSERT INTO {cls.name} ({clm})\nVALUES ({values[:-1]});"
-        conn = DatabaseConnection.get_connection()
-        conn.cursor().execute(query)
-        conn.commit()
+        try:
+            self.db_obj.execute(query)
+        except dbError as err:
+            print(f'Error while inserting new row into "{cls.name}".')
+            print(f"Error description: {err}")
 
     @classmethod
     def fetch(
         cls,
-        select: Tuple[str] = ("*",),
+        select: str = "*",
         where: str = None,
-        order_by: List[Tuple[str, bool]] = None,
+        order_by: str = None,
+        descending: bool = False,
         limit: int = None,
         offset: int = None,
-    ) -> List[Tuple]:
+    ) -> dict:
         """Executes select query in the table of model instance.
 
         Returns:
-            list: List of fetched rows as tuple of selected columns
+            dict: List of fetched rows as dictionary of selected columns
         """
         query = f'SELECT {",".join(select)} FROM {cls.name}'
         if where:
             query = f"{query} WHERE {where}"
         if order_by:
-            orders = ",".join(
-                [f'{order[0]} {"ASC" if order[1] else "DESC"}' for order in order_by]
-            )
-            query = f"{query} ORDER BY {orders}"
+            query = f"{query} ORDER BY {order_by}"
+            if descending:
+                query = f"{query} DESC"
         if limit:
             query = f"{query} LIMIT {limit}"
         if offset:
             query = f"{query} OFFSET {offset}"
-        conn = DatabaseConnection.get_connection()
-        cursor = conn.cursor()
-        cursor.execute(query)
-        rows = cursor.fetchall()
-        print(cursor.rowcount)
-        if select[0] == "*":
-            columns = [column[0] for column in cursor.description]
-            results = [dict(zip(columns, row)) for row in rows]
-            return [cls(**item) for item in results]
-        return rows
+        try:
+            results = cls.db_obj.fetch(query)
+        except dbError as err:
+            print(f'Error while fetching from "{cls.name}".')
+            print(f"Error description: {err}")
+            return {}
+        else:
+            return results
+
+    @classmethod
+    def fetch_obj(
+        cls,
+        where: str = None,
+        order_by: str = None,
+        descending: bool = False,
+        limit: int = None,
+        offset: int = None,
+    ) -> List["BaseModel"]:
+        """Executes select query in the table of model instance.
+
+        Returns:
+            "BaseModel": List of fetched rows as instances of the class
+        """
+        results = cls.fetch(
+            select="*",
+            where=where,
+            order_by=order_by,
+            descending=descending,
+            limit=limit,
+            offset=offset,
+        )
+        return [cls(**item) for item in results]
 
 
 class UserRole(Enum):

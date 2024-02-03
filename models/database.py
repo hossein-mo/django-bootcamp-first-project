@@ -43,7 +43,7 @@ class DatabaseConnection(metaclass=SingletonMeta):
                 pool_size=self.pool_size, pool_reset_session=True, **self.__dbconfig
             )
 
-    def update(self, query: str) -> int:
+    def execute(self, query: str) -> int:
         connection = self.pool.get_connection()
         cursor = connection.cursor(dictionary=True)
         cursor.execute(query)
@@ -52,9 +52,6 @@ class DatabaseConnection(metaclass=SingletonMeta):
         cursor.close()
         connection.close()
         return rowscount
-
-    def execute(self, query: str) -> None:
-        self.update(query)
 
     def fetch(self, query: str) -> list:
         connection = self.pool.get_connection()

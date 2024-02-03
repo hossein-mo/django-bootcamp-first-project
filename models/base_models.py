@@ -89,6 +89,10 @@ class BaseModel:
     db_obj = DatabaseConnection()
 
     @classmethod
+    def create_new(cls, **kwargs):
+        return cls(**kwargs)
+
+    @classmethod
     def get_columns(cls) -> List[Column]:
         """Create a list of class attributes that are instances of Column class.
 
@@ -224,7 +228,7 @@ class BaseModel:
         return [cls(**item) for item in results]
 
     def get_comma_seperated(self, columns: List[Column]) -> str:
-        """Get the value of model as a comma seperated string
+        """Get value of instance attributes as a comma seperated string
 
         Args:
             columns (List[Column]): list of column o return their values
@@ -273,7 +277,18 @@ class BaseModel:
             if set_from_db:
                 self.__dict__[set_from_db.name] = rowid
 
-    def update(self, colval: Dict[Column, Any], where: str = "default") -> int:
+    def update_query(self, colval: Dict[Column, Any], where: str = "default") -> str:
+        """Generates the query for updating with specified inputs
+
+        Args:
+            colval (Dict[Column, Any]): A dictionary where keys are Column to update and \
+                its value is the new value of the column.
+            where (str, optional): Condition for updating if equal to 'default' \
+                it will generate update query based on primary keys. Defaults to "default".
+
+        Returns:
+            str: query for updating
+        """
         query = f"UPDATE {self.name} SET"
         for column in colval:
             query = f'{query} {column.name} = "{colval[column]}",'
@@ -285,12 +300,28 @@ class BaseModel:
             for pk in pks:
                 query = f'{query} {pk.name}="{obj_dict[pk.name]}" AND'
             query = f"{query[:-4]};"
+            return query
         else:
             query = f"{query} {where}"
+            return query
+
+    def update(self, colval: Dict[Column, Any], where: str = "default") -> int:
+        """Update row(s) with specified inputs
+
+        Args:
+            colval (Dict[Column, Any]): A dictionary where keys are Column to update and \
+                its value is the new value of the column.
+            where (str, optional): Condition for updating if equal to 'default' \
+                it will generate update query based on primary keys. Defaults to "default".
+
+        Returns:
+            int: number of rows affected.
+        """
+        query = self.update_query(colval, where)
         try:
             rowcount, _ = self.db_obj.execute(query)
         except dbError as err:
-            print(f'Error updating "{cls.name}".')
+            print(f'Error updating "{self.name}".')
             print(f"Error description: {err}")
             return 0
         else:

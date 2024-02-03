@@ -2,6 +2,7 @@ import mysql.connector
 import os
 import sys
 from mysql.connector import pooling
+from typing import List
 
 sys.path.append(os.path.dirname(os.path.dirname(__file__)))
 from meta import SingletonMeta
@@ -63,3 +64,21 @@ class DatabaseConnection(metaclass=SingletonMeta):
         cursor.close()
         connection.close()
         return result
+
+    def transaction(self, query_list: List[str]) -> int:
+        connection = self.pool.get_connection()
+        connection.start_transaction()
+        cursor = connection.cursor(dictionary=True)
+        try:
+            for query in query_list:
+                cursor.execute(query)
+            connection.commit()
+        except mysql.connector.Error as err:
+            connection.rollback()
+            raise
+        else:
+            rowscount = cursor.rowcount
+            return rowscount
+        finally:
+            cursor.close()
+            connection.close()

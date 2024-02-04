@@ -177,7 +177,7 @@ class BaseModel:
         descending: bool = False,
         limit: int = None,
         offset: int = None,
-    ) -> dict:
+    ) -> List[dict]:
         """Executes select query in the table of model instance.
 
         Returns:
@@ -199,7 +199,7 @@ class BaseModel:
         except dbError as err:
             print(f'Error while fetching from "{cls.name}".')
             print(f"Error description: {err}")
-            return {}
+            return []
         else:
             return results
 
@@ -225,7 +225,10 @@ class BaseModel:
             limit=limit,
             offset=offset,
         )
-        return [cls(**item) for item in results]
+        if results:
+            return [cls(**item) for item in results]
+        else:
+            return results
 
     def get_comma_seperated(self, columns: List[Column]) -> str:
         """Get value of instance attributes as a comma seperated string

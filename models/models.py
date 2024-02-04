@@ -13,9 +13,9 @@ from utils.utils import hash_password
 class User(BaseModel):
     name = "user"
     id = Column("id", "INT UNSIGNED", primary_key=True, auto_increment=True)
-    username = Column("username", "VARCHAR(255)")
+    username = Column("username", "VARCHAR(255)", unique=True)
     password = Column("password", "CHAR(64)")
-    email = Column("email", "VARCHAR(255)")
+    email = Column("email", "VARCHAR(255)", unique=True)
     phone_number = Column("phone_number", "VARCHAR(255)", null=True)
     wallet = Column("wallet", "INT UNSIGNED")
     role = Column(

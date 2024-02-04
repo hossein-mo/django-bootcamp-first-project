@@ -3,9 +3,11 @@ import sys
 from enum import Enum
 from typing import Union, Any, List, Dict
 from mysql.connector import Error as dbError
+from mysql.connector import IntegrityError
 
 sys.path.append(os.path.dirname(os.path.dirname(__file__)))
 from database import DatabaseConnection
+from model_exceptions import DuplicatedEntry
 
 
 class Column:
@@ -273,6 +275,10 @@ class BaseModel:
         query = f"INSERT INTO {cls.name} ({clm})\nVALUES ({values[:-1]});"
         try:
             _, rowid = self.db_obj.execute(query)
+        except IntegrityError as err:
+            print(f'Error while inserting new row into "{cls.name}".')
+            print(f"Error description: {err}")
+            raise DuplicatedEntry(err.msg)
         except dbError as err:
             print(f'Error while inserting new row into "{cls.name}".')
             print(f"Error description: {err}")

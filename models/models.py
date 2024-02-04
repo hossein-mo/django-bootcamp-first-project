@@ -1,9 +1,13 @@
 from base_models import Column, UserRole, BaseModel
 from datetime import datetime, date
 from typing import Union
-from utils import hash_password
+import os
+import sys
 from model_exceptions import NotEnoughBalance
 from mysql.connector import Error as dbError
+
+sys.path.append(os.path.dirname(os.path.dirname(__file__)))
+from utils.utils import hash_password
 
 
 class User(BaseModel):

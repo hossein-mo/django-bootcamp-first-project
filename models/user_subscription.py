@@ -1,11 +1,9 @@
-from datetime import datetime
-import mysql.connector
+from mysql.connector import dbError
 
 from controllers.exceptions import *
-from models.database import DatabaseConnection
-from models.base_models import Column, BaseModel
-from models.subscription import Subscription
-from models.user import User
+from base_models import Column, BaseModel
+from subscription import Subscription
+from user import User
 
 class UserSubscription(BaseModel):
     name = "user_subscription"
@@ -22,32 +20,22 @@ class UserSubscription(BaseModel):
     
     @staticmethod
     def set_user_subscription(user, subscription):
-        UserSubscriptionRepo.set_user_subscription(user, subscription.id)
-
-
-class UserSubscriptionRepo:
-
-    @staticmethod
-    def set_user_subscription(user, subscription_id):
-        conn = DatabaseConnection().get_connection()
-        cursor = conn.cursor()
-        query = ""
+        queries = []
+        duration = Subscription.fetch(select=f'{Subscription.duration.name}', where=f'{Subscription.id.name}={subscription.id}')
+        duration - duration[0][Subscription.duration.name]
+        price = Subscription.fetch(select=f'{Subscription.price.name}', where=f'{Subscription.id.name}={subscription.id}')
+        price = price[0][Subscription.price.name]
+        if user.subscription is not None:
+                queries.append(f'UPDATE {UserSubscription.name} SET {UserSubscription.expire_date.name} = now() WHERE \
+                               {UserSubscription.id.name} = (SELECT {UserSubscription.id.name} from {UserSubscription.name} WHERE \
+                                    {UserSubscription.user_id.name} = {user.id} AND {UserSubscription.expire_date.name}>now())')
+                
+        queries.append(f'UPDATE {User.name} SET {User.wallet.name}={User.wallet.name} - {price} WHERE {User.id.name} = {user.id}')
+        queries.append(f'INSERT INTO {UserSubscription.name} VALUES ({user.id}, {subscription.id}, NOW(), DATE_ADD(NOW(), INTERVAL {duration} DAY))')
+        
         try:
-            cursor.execute("START TRANSACTION")
-            if user.subscription is not None:
-                query = f'UPDATE {UserSubscription.name} SET {UserSubscription.expiry_date.name} = now() WHERE \
-                               {UserSubscription.user_id.name} = %s AND expire_date=(SELECT expire_date from {UserSubscription.name} WHERE \
-                                    {UserSubscription.user_id.name} = %s AND {UserSubscription.expire_date.name}>now())'
-                cursor.execute(query, (user.id, user.id,))
-            query = f'UPDATE {User.name} SET {User.wallet.name}={User.wallet.name} - (SELECT {Subscription.price.name} \
-                           from {Subscription.name} WHERE {Subscription.id.name}=%s) WHERE {User.id.name} = %s'
-            cursor.execute(query, (subscription_id, user.id,))
-            query = f'INSERT INTO {UserSubscription.name} VALUES (%s, %s, now(), now()+(SELECT {Subscription.duration.name} \
-                        from {Subscription.name} WHERE {Subscription.id.name}=%s))'
-            cursor.execute(query, (user.id, subscription_id, subscription_id,))
-            conn.commit()
-        except mysql.connector.Error as err:
-            conn.rollback()
-            raise InsertFailed("Some problem occurred while register subscription. Try again!")
-        finally:
-            cursor.close()
+            UserSubscription.db_obj.transaction(queries)
+        except dbError as err:
+            # print(f'Error while updating rows in "{self.name}".')
+            print(f"Error description: {err}")
+

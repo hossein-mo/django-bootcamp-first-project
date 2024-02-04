@@ -336,6 +336,8 @@ class BaseModel:
         else:
             return rowcount
 
+    def delete(self, where: str = "default") -> int:
+        pass
 
 class UserRole(Enum):
     ADMIN = "admin"

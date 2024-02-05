@@ -1,9 +1,14 @@
 from base_models import Column, UserRole, BaseModel
 from datetime import datetime, date
-from typing import Union
+from typing import Union, Dict
 import os
 import sys
-from model_exceptions import NotEnoughBalance
+from model_exceptions import (
+    NotEnoughBalance,
+    UserNotExist,
+    WrongCredentials,
+    DuplicatedEntry,
+)
 from mysql.connector import Error as dbError
 
 sys.path.append(os.path.dirname(os.path.dirname(__file__)))
@@ -63,6 +68,24 @@ class User(BaseModel):
         self.phone_number = phone_number
         self.wallet = wallet
 
+    def update_last_login(self) -> None:
+        self.last_login = datetime.now()
+        self.update({User.last_login: self.last_login})
+
+    @staticmethod
+    def autenthicate(username: str, password: str) -> "User":
+        password = hash_password(password)
+        user = User.fetch_obj(where=f'{User.username} = "{username}"')
+        if not user:
+            print("user doesn't exist")
+            raise UserNotExist
+        else:
+            user = user[0]
+            if user.password != password:
+                print("wrong password")
+                raise WrongCredentials
+            return user
+
     @classmethod
     def create_new(
         cls,
@@ -71,9 +94,7 @@ class User(BaseModel):
         email: str,
         phone_number: str,
         role: Union[str, UserRole],
-        birth_date: date,
-        register_date: datetime,
-        last_login: datetime,
+        birth_date: Dict[str, int],
     ) -> "User":
         """_summary_
 
@@ -92,18 +113,23 @@ class User(BaseModel):
                 wallet balance set to zero and hashed password.
         """
         password = hash_password(password)
-        wallet = 0
-        return cls(
+        birth_date = date(birth_date["year"], birth_date["month"], birth_date["year"])
+        rightnow = datetime.now()
+        user = cls(
             username,
             password,
             email,
             phone_number,
-            wallet,
             role,
             birth_date,
-            register_date,
-            last_login,
+            rightnow,
+            rightnow,
         )
+        try:
+            user.insert()
+        except DuplicatedEntry as err:
+            print("entered username or email is taken")
+            raise WrongCredentials
 
 
 class BankAccount(BaseModel):
@@ -145,12 +171,18 @@ class BankAccount(BaseModel):
 
     def delete(self):
         self.delete()
-   
+
     def update(self):
-        self.update({BankAccount.card_number : self.card_number, BankAccount.cvv2 : self.cvv2, BankAccount.password : self.password})
-    
+        self.update(
+            {
+                BankAccount.card_number: self.card_number,
+                BankAccount.cvv2: self.cvv2,
+                BankAccount.password: self.password,
+            }
+        )
+
     @staticmethod
-    def add_new_account(account:'BankAccount'):
+    def add_new_account(account: "BankAccount"):
         account.insert()
 
     def deposit(self, amount: int) -> None:
@@ -162,7 +194,7 @@ class BankAccount(BaseModel):
         self.balance += amount
         self.update({BankAccount.balance: self.balance})
 
-    def withdraw(self, amount:int) -> None:
+    def withdraw(self, amount: int) -> None:
         self.balance -= amount
         self.update({BankAccount.balance: self.balance})
 
@@ -217,20 +249,27 @@ class Subscription(BaseModel):
     duration = Column("duration", "SMALLINT UNSIGNED")
     order_number = Column("order_number", "VARCHAR(255)", null=True)
 
-
-    def __init__(self, name, discount, duration= 30, order_number=0, id: Union[int, None] = None):
+    def __init__(
+        self, name, discount, duration=30, order_number=0, id: Union[int, None] = None
+    ):
         self.id = id
         self.name = name
         self.discount = discount
         self.duration = duration
         self.order_number = order_number
-    
+
     def set_new_subscription(self):
         self.insert()
 
     def edit_subscription(self):
-        self.update({Subscription.s_name : self.name, Subscription.discount : self.discount, \
-                     Subscription.duration : self.duration, Subscription.order_number : self.order_number})
+        self.update(
+            {
+                Subscription.s_name: self.name,
+                Subscription.discount: self.discount,
+                Subscription.duration: self.duration,
+                Subscription.order_number: self.order_number,
+            }
+        )
 
     def delete_subscription(self):
         self.delete()
@@ -262,8 +301,14 @@ class Movie(BaseModel):
         self.insert()
 
     def edit_movie(self):
-        self.update({Movie.m_name : self.name, Movie.duration : self.duration, \
-                     Movie.age_rating : self.age_rating, Movie.screening_number : self.screening_number})
+        self.update(
+            {
+                Movie.m_name: self.name,
+                Movie.duration: self.duration,
+                Movie.age_rating: self.age_rating,
+                Movie.screening_number: self.screening_number,
+            }
+        )
 
     def delete_movie(self):
         self.delete()
@@ -272,13 +317,25 @@ class Movie(BaseModel):
 class Comment(BaseModel):
     name = "comment"
     id = Column("id", "INT UNSIGNED", primary_key=True, auto_increment=True)
-    user_id = Column("user_id", "INT UNSIGNED", foreign_key=User.id.name, reference=User.name)
-    movie_id = Column("movie_id", "INT UNSIGNED", foreign_key=Movie.id.name, reference=Movie.name)
+    user_id = Column(
+        "user_id", "INT UNSIGNED", foreign_key=User.id.name, reference=User.name
+    )
+    movie_id = Column(
+        "movie_id", "INT UNSIGNED", foreign_key=Movie.id.name, reference=Movie.name
+    )
     parent_id = Column("parent_id", "INT UNSIGNED", foreign_key=id.name, reference=name)
     text = Column("text", "TEXT")
     created_at = Column("created_at", "DATE")
 
-    def __init__(self, user_id, movie_id, parent_id, text, created_at=datetime.datetime.now(), id: Union[int, None] = None):
+    def __init__(
+        self,
+        user_id,
+        movie_id,
+        parent_id,
+        text,
+        created_at=datetime.datetime.now(),
+        id: Union[int, None] = None,
+    ):
         self.id = id
         self.user_id = user_id
         self.movie_id = movie_id
@@ -286,23 +343,23 @@ class Comment(BaseModel):
         self.text = text
         self.created_at = created_at
         self.replies = []
-    
+
     @staticmethod
     def comment(user_id, movie_id, parent_id, text) -> None:
         Comment(None, user_id, movie_id, parent_id, text).insert()
 
     @staticmethod
-    def get_comments(movie_id) -> list['Comment']:
+    def get_comments(movie_id) -> list["Comment"]:
         result = []
-        comments = Comment.fetch_obj(f'{Comment.movie_id} = {movie_id}')
+        comments = Comment.fetch_obj(f"{Comment.movie_id} = {movie_id}")
         for i in range(len(comments)):
             if comments[i].parent_id == 0:
                 result.append(comments[i])
-            for j in range(i+1, len(comments)):
+            for j in range(i + 1, len(comments)):
                 if comments[j].parent_id == comments[i].id:
                     comments[i].replies.append(comments[j])
         return result
-    
+
 
 class UserSubscription(BaseModel):
     name = "user_subscription"
@@ -311,27 +368,41 @@ class UserSubscription(BaseModel):
         "user_id", "INT UNSIGNED", foreign_key=User.id.name, reference=User.name
     )
     subscription_id = Column(
-        "subscription_id", "INT UNSIGNED", foreign_key=Subscription.id.name, reference=Subscription.name
+        "subscription_id",
+        "INT UNSIGNED",
+        foreign_key=Subscription.id.name,
+        reference=Subscription.name,
     )
     buy_date = Column("buy_date", "DATETIME")
     expire_date = Column("expire_date", "DATETIME")
 
-    
     @staticmethod
     def set_user_subscription(user, subscription):
         queries = []
-        duration = Subscription.fetch(select=f'{Subscription.duration.name}', where=f'{Subscription.id.name}={subscription.id}')
+        duration = Subscription.fetch(
+            select=f"{Subscription.duration.name}",
+            where=f"{Subscription.id.name}={subscription.id}",
+        )
         duration - duration[0][Subscription.duration.name]
-        price = Subscription.fetch(select=f'{Subscription.price.name}', where=f'{Subscription.id.name}={subscription.id}')
+        price = Subscription.fetch(
+            select=f"{Subscription.price.name}",
+            where=f"{Subscription.id.name}={subscription.id}",
+        )
         price = price[0][Subscription.price.name]
         if user.subscription is not None:
-                queries.append(f'UPDATE {UserSubscription.name} SET {UserSubscription.expire_date.name} = now() WHERE \
+            queries.append(
+                f"UPDATE {UserSubscription.name} SET {UserSubscription.expire_date.name} = now() WHERE \
                                {UserSubscription.id.name} = (SELECT {UserSubscription.id.name} from {UserSubscription.name} WHERE \
-                                    {UserSubscription.user_id.name} = {user.id} AND {UserSubscription.expire_date.name}>now())')
-                
-        queries.append(f'UPDATE {User.name} SET {User.wallet.name}={User.wallet.name} - {price} WHERE {User.id.name} = {user.id}')
-        queries.append(f'INSERT INTO {UserSubscription.name} VALUES ({user.id}, {subscription.id}, NOW(), DATE_ADD(NOW(), INTERVAL {duration} DAY))')
-        
+                                    {UserSubscription.user_id.name} = {user.id} AND {UserSubscription.expire_date.name}>now())"
+            )
+
+        queries.append(
+            f"UPDATE {User.name} SET {User.wallet.name}={User.wallet.name} - {price} WHERE {User.id.name} = {user.id}"
+        )
+        queries.append(
+            f"INSERT INTO {UserSubscription.name} VALUES ({user.id}, {subscription.id}, NOW(), DATE_ADD(NOW(), INTERVAL {duration} DAY))"
+        )
+
         try:
             UserSubscription.db_obj.transaction(queries)
         except dbError as err:

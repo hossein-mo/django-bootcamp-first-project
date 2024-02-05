@@ -69,11 +69,25 @@ class User(BaseModel):
         self.wallet = wallet
 
     def update_last_login(self) -> None:
+        """Updated the last login time of the user in database to now"""
         self.last_login = datetime.now()
         self.update({User.last_login: self.last_login})
 
     @staticmethod
     def autenthicate(username: str, password: str) -> "User":
+        """_summary_
+
+        Args:
+            username (str): username
+            password (str): password
+
+        Raises:
+            UserNotExist: if user with input username dosen't exist in database
+            WrongCredentials: if input password doesn't match the user password
+
+        Returns:
+            User: autenthicated user
+        """
         password = hash_password(password)
         user = User.fetch_obj(where=f'{User.username} = "{username}"')
         if not user:
@@ -105,8 +119,6 @@ class User(BaseModel):
             phone_number (str): user phone_number
             role (Union[str, UserRole]): user role
             birth_date (date): user birth_date
-            register_date (datetime): user register_date
-            last_login (datetime): user last_login
 
         Returns:
             User: return a User instance with specified inputs with \
@@ -120,6 +132,7 @@ class User(BaseModel):
             password,
             email,
             phone_number,
+            0,
             role,
             birth_date,
             rightnow,

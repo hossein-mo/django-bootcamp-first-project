@@ -5,7 +5,7 @@ from mysql.connector import pooling
 from typing import List, Tuple
 
 sys.path.append(os.path.dirname(os.path.dirname(__file__)))
-from meta import SingletonMeta
+from models.meta import SingletonMeta
 
 
 class DatabaseConnection(metaclass=SingletonMeta):

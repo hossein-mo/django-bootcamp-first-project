@@ -17,3 +17,7 @@ def hash_password(password: str) -> str:
     hashed_password = sha256_hash.hexdigest()
 
     return hashed_password
+
+
+def create_response(status: bool, type: str, message: str, data: dict | list):
+    return {"status": status, "type": type, "message": message, "data": data}

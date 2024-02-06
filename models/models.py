@@ -75,7 +75,7 @@ class User(BaseModel):
         self.update({User.last_login: self.last_login})
 
     @staticmethod
-    def autenthicate(username: str, password: str) -> "User":
+    def autenthicate(usercred: Dict[str, str]) -> "User":
         """_summary_
 
         Args:
@@ -89,8 +89,11 @@ class User(BaseModel):
         Returns:
             User: autenthicated user
         """
-        password = hash_password(password)
-        user = User.fetch_obj(where=f'{User.username} = "{username}"')
+        password = hash_password(usercred["password"])
+        if "username" in usercred:
+            user = User.fetch_obj(where=f'{User.username} = "{usercred["username"]}"')
+        else:
+            user = User.fetch_obj(where=f'{User.email} = "{usercred["email"]}"')
         if not user:
             print("user doesn't exist")
             raise WrongCredentials

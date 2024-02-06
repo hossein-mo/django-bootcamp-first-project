@@ -25,14 +25,14 @@ class TCPServer:
     def client_handler(client_socket: socket.socket, bufsize):
         request = client_socket.recv(bufsize)
         request = pickle.loads(request)
-        response, user = UserManagement.client_authenticatation(client_socket, bufsize)
+        response, user = UserManagement.client_authenticatation(request)
         client_socket.sendall(pickle.dumps(response))
         if user:
             while True:
                 request = client_socket.recv(bufsize)
-                request = pickle.loads(request)
                 if not request:
                     break
+                request = pickle.loads(request)
                 if request["type"] == "profile":
                     if request["subtype"] == "update":
                         response, user = UserManagement.edit_profile(
@@ -62,5 +62,5 @@ class TCPServer:
 
 
 if __name__ == "__main__":
-    server = TCPServer("localhost", 8001, 4096)
+    server = TCPServer("localhost", 8000, 4096)
     server.start_server()

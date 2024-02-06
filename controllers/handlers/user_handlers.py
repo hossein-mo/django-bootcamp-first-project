@@ -116,10 +116,8 @@ class ProfileInfoUpdate(AbstractHandler):
 
 class LoginHandler(AbstractHandler):
     def handle(self, data: Any) -> User | None:
-        username = data["username"]
-        password = data["password"]
         try:
-            user = User.autenthicate(username, password)
+            user = User.autenthicate(data)
         except WrongCredentials as err:
             raise
         else:

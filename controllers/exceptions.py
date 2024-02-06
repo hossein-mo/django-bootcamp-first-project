@@ -29,6 +29,6 @@ class InvalidUserInfo(Exception):
 
 
 class AuthenticationFaild(Exception):
-    def __init__(self, message: str = "User authentication faild. Please login"):
+    def __init__(self, message: str = "User authentication faild. Please login."):
         self.message = message
         super().__init__(self.message)

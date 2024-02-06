@@ -329,11 +329,17 @@ class BaseModel:
         query = self.update_query(colval, where)
         try:
             rowcount, _ = self.db_obj.execute(query)
+        except IntegrityError as err:
+            print(f'Error while inserting new row into "{self.name}".')
+            print(f"Error description: {err}")
+            raise DuplicatedEntry(err.msg)
         except dbError as err:
             print(f'Error updating "{self.name}".')
             print(f"Error description: {err}")
             return 0
         else:
+            for column in colval:
+                self.__dict__[column.name] = colval[column]
             return rowcount
 
     def delete(self, where: str = "default") -> int:

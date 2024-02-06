@@ -3,8 +3,9 @@ import sys
 from datetime import datetime, date
 from mysql.connector import Error as dbError
 from typing import Union, Dict
-
+from abc import ABC, abstractmethod
 sys.path.append(os.path.dirname(os.path.dirname(__file__)))
+
 from utils.utils import hash_password
 from models.base_models import Column, UserRole, BaseModel
 from models.model_exceptions import (
@@ -12,6 +13,7 @@ from models.model_exceptions import (
     WrongCredentials,
     DuplicatedEntry,
 )
+
 
 
 class User(BaseModel):
@@ -274,7 +276,7 @@ class Subscription(BaseModel):
     def set_new_subscription(self):
         self.insert()
 
-    def edit_subscription(self):
+    def update_subscription(self):
         self.update(
             {
                 Subscription.s_name: self.name,
@@ -303,17 +305,19 @@ class Movie(BaseModel):
         age_rating: int,
         screening_number: int,
         id: Union[int, None] = None,
+        rate=0,
     ) -> None:
         self.id = id
         self.name = name
         self.duration = duration
         self.age_rating = age_rating
         self.screening_number = screening_number
+        self.rate = rate
 
     def add_movie(self):
         self.insert()
 
-    def edit_movie(self):
+    def update_movie(self):
         self.update(
             {
                 Movie.m_name: self.name,
@@ -326,6 +330,41 @@ class Movie(BaseModel):
     def delete_movie(self):
         self.delete()
 
+    @classmethod
+    def get_movies_list(cls) -> list['Movie']:
+        query = f"SELECT {Movie.name}.*, {Movie.rate} from {Movie.name} m \
+                  LEFT JOIN (SELECT {MovieRate.movie_id.name}, \
+                  SUM({MovieRate.rate.name})/COUNT({MovieRate.rate.name}) as {Movie.rate} from {MovieRate.name} \
+                  GROUP BY {MovieRate.movie_id.name}) rt ON m.{Movie.id.name}=rt.{MovieRate.movie_id.name})"
+        results = cls.db_obj.fetch(query)
+        return [cls(**item) for item in results]
+
+
+class MovieRate(BaseModel):
+    name = "movie_rate"
+    id = Column("id", "INT UNSIGNED", primary_key=True, auto_increment=True)
+    user_id = Column(
+        "user_id", "INT UNSIGNED", foreign_key=User.id.name, reference=User.name
+    )
+    movie_id = Column(
+        "movie_id", "INT UNSIGNED", foreign_key=Movie.id.name, reference=Movie.name
+    )
+    rate = Column("rate", "INT UNSIGNED")
+
+    def __init__(
+        self,
+        user_id,
+        movie_id,
+        name: str,
+        rate: int,
+        id: Union[int, None] = None,
+    ) -> None:
+        self.id = id
+        self.name = name
+        self.rate = rate
+        self.user_id = user_id
+        self.movie_id = movie_id
+
 
 class Comment(BaseModel):
     name = "comment"
@@ -336,7 +375,8 @@ class Comment(BaseModel):
     movie_id = Column(
         "movie_id", "INT UNSIGNED", foreign_key=Movie.id.name, reference=Movie.name
     )
-    parent_id = Column("parent_id", "INT UNSIGNED", foreign_key=id.name, reference=name)
+    parent_id = Column("parent_id", "INT UNSIGNED",
+                       foreign_key=id.name, reference=name)
     text = Column("text", "TEXT")
     created_at = Column("created_at", "DATE")
 
@@ -421,3 +461,192 @@ class UserSubscription(BaseModel):
         except dbError as err:
             # print(f'Error while updating rows in "{self.name}".')
             print(f"Error description: {err}")
+
+
+class Theater(BaseModel):
+    name = "theater"
+    id = Column("id", "INT UNSIGNED", primary_key=True, auto_increment=True)
+    tname = Column("name", "VARCHAR(255)")
+    capacity = Column("Capacity", "INT UNSIGNED")
+
+    def __init__(
+        self,
+        name: str,
+        capacity: int,
+        id: Union[int, None] = None,
+    ) -> None:
+        self.id = id
+        self.name = name
+        self.Capacity = capacity
+
+
+class Theater_Rate(BaseModel):
+    name = "theater_rate"
+    id = Column("id", "INT UNSIGNED", primary_key=True, auto_increment=True)
+    user_id = Column("user_id", "INT UNSIGNED",
+                     foreign_key=User.id.name, reference=User.name)
+    theater_id = Column("theater_id", "INT UNSIGNED",
+                        foreign_key=Theater.id.name, reference=Theater.name)
+    rate = Column("rate", "INT UNSIGNED")
+
+    def __init__(
+        self,
+        user_id,
+        theater_id,
+        name: str,
+        rate: int,
+
+        id: Union[int, None] = None,
+    ) -> None:
+        self.id = id
+        self.name = name
+        self.rate = rate
+        self.user_id = user_id
+        self.theater_id = theater_id
+
+
+class Show(BaseModel):
+    name = "show"
+    id = Column("id", "INT UNSIGNED", primary_key=True, auto_increment=True)
+    movie_id = Column(
+        "movie_id", "INT UNSIGNED", foreign_key=Movie.id.name, reference=Movie.name
+    )
+    theater_id = Column(
+        "theater_id",
+        "INT UNSIGNED",
+        foreign_key=Theater.id.name,
+        reference=Theater.name,
+    )
+    start_date = Column("start_date", "DATETIME")
+    end_date = Column("end_date", "DATETIME")
+    price = Column("price", "INT UNSIGNED")
+
+    def __init__(
+        self,
+        movie_id,
+        theater_id,
+        start_date,
+        end_date,
+        price,
+        id: Union[int, None] = None,
+        movie: Movie = None,
+        theater: Theater = None,
+    ):
+        self.id = id
+        self.movie_id = movie_id
+        self.theater_id = theater_id
+        self.start_date = start_date
+        self.end_date = end_date
+        self.price = price
+        self.movie = movie
+        self.theater = theater
+
+    def add_show(self):
+        self.insert()
+
+    def update_show(self):
+        self.update(
+            {
+                Show.movie_id: self.movie_id,
+                Show.theater_id: self.theater_id,
+                Show.start_date: self.start_date,
+                Show.end_date: self.end_date,
+                Show.price: self.price,
+            }
+        )
+
+    def delete_show(self):
+        self.delete()
+
+    def get_reserved_seat(self) -> list[int]:
+        """Returns reserved seat numbers of given show
+
+        Returns:
+            list: List of reserved seat number
+        """
+        results = Show.fetch(select=Order.seat_number.name,
+                             where=f'{Order.show_id.name} = {self.id} AND {Order.cancel_date.name} IS NULL')
+        return [d[Order.seat_number.name] for d in results]
+
+    def get_show_capacity(self) -> int:
+        """Returns the number of reserved seats
+        """
+        reserved_seats = "reserved_seats"
+        results = Show.fetch(select=f'COUNT(*) as reserved_seats',
+                             where=f'{Order.show_id.name} = {self.id} AND {Order.cancel_date.name} IS NULL')
+        return results[0][reserved_seats]
+
+    @classmethod
+    def get_shows_list(cls) -> list['Movie']:
+        """returns a list of shows along with related movie (also it's rate) and theater object.
+
+        Returns:
+            list: List of Movies
+        """
+        show_id, movie_id, theater_id = 's_id', 'm_id', 't_id'
+        sub_query = f"SELECT {Movie.name}.*, {Movie.rate} from {Movie.name} m
+                      LEFT JOIN (SELECT {MovieRate.movie_id.name},
+                      SUM({MovieRate.rate.name})/COUNT({MovieRate.rate.name}) as {Movie.rate} from {MovieRate.name} 
+                      GROUP BY {MovieRate.movie_id.name}) rt ON m.{Movie.id.name}=rt.{MovieRate.movie_id.name})"
+        query = f"SELECT s.*, s.id as {show_id}, m.*, m.id as {movie_id}, th.*, th.id as {theater_id} 
+                    FROM {Show.name} s
+                    JOIN {sub_query} m ON s.{Show.movie_id.name} = m.{Movie.id.name} 
+                    JOIN {Theater.name} th ON s.{Show.theater_id.name} = th.{Theater.id.name} 
+                    WHERE {Show.start_date.name} > now()"
+        results = cls.db_obj.execute(query)
+        list = []
+        for item in results:
+            show_obj = cls(item[Show.movie_id.name], item[Show.theater_id.name],
+                           item[Show.start_date.name], item[Show.end_date.name], item[Show.price.name], item[show_id])
+            show_obj.movie = Movie(item[Movie.m_name.name], item[Movie.duration.name],
+                                   item[Movie.age_rating.name], item[Movie.screening_number.name], item[movie_id])
+            show_obj.theater = Theater(
+                item[Theater.tname.name], item[Theater.capacity.name], item[theater_id])
+            list.append(show_obj)
+        return list
+
+
+class Order(BaseModel):
+    name = "order"
+    id = Column("id", "INT UNSIGNED", primary_key=True, auto_increment=True)
+    user_id = Column(
+        "user_id", "INT UNSIGNED", foreign_key=User.id.name, reference=User.name
+    )
+    show_id = Column(
+        "show_id",
+        "INT UNSIGNED",
+        foreign_key=Show.id.name,
+        reference=Show.name,
+    )
+    seat_number = Column("seat_number", "SMALLINT UNSIGNED")
+    discount = Column("discount", "SMALLINT UNSIGNED")
+    create_date = Column("create_date", "DATETIME")
+    cancel_date = Column("cancel_date", "DATETIME", null=True)
+
+    def __init__(
+        self,
+        user_id,
+        show_id,
+        seat_number,
+        discount,
+        create_date=datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+        cancel_date: Union[str, None] = None,
+        id: Union[int, None] = None,
+    ):
+        self.id = id
+        self.user_id = user_id
+        self.show_id = show_id
+        self.seat_number = seat_number
+        self.discount = discount
+        self.create_date = create_date
+        self.cancel_date = cancel_date
+
+    def reserve(self):
+        self.insert()
+
+    def cancel_order(self):
+        pass
+
+    @classmethod
+    def get_user_orders(cls):
+        pass

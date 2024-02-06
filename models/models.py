@@ -1,19 +1,19 @@
-from abc import ABC, abstractmethod
-from utils.utils import hash_password
-from base_models import Column, UserRole, BaseModel
-from datetime import datetime, date
-from typing import Union, Dict
 import os
 import sys
-from model_exceptions import (
+from datetime import datetime, date
+from mysql.connector import Error as dbError
+from typing import Union, Dict
+from abc import ABC, abstractmethod
+sys.path.append(os.path.dirname(os.path.dirname(__file__)))
+
+from utils.utils import hash_password
+from models.base_models import Column, UserRole, BaseModel
+from models.model_exceptions import (
     NotEnoughBalance,
-    UserNotExist,
     WrongCredentials,
     DuplicatedEntry,
 )
-from mysql.connector import Error as dbError
 
-sys.path.append(os.path.dirname(os.path.dirname(__file__)))
 
 
 class User(BaseModel):
@@ -93,7 +93,7 @@ class User(BaseModel):
         user = User.fetch_obj(where=f'{User.username} = "{username}"')
         if not user:
             print("user doesn't exist")
-            raise UserNotExist
+            raise WrongCredentials
         else:
             user = user[0]
             if user.password != password:
@@ -126,8 +126,6 @@ class User(BaseModel):
                 wallet balance set to zero and hashed password.
         """
         password = hash_password(password)
-        birth_date = date(birth_date["year"],
-                          birth_date["month"], birth_date["year"])
         rightnow = datetime.now()
         user = cls(
             username,
@@ -144,7 +142,9 @@ class User(BaseModel):
             user.insert()
         except DuplicatedEntry as err:
             print("entered username or email is taken")
-            raise WrongCredentials
+            raise
+        else:
+            return user
 
 
 class BankAccount(BaseModel):
@@ -386,7 +386,7 @@ class Comment(BaseModel):
         movie_id,
         parent_id,
         text,
-        created_at=datetime.datetime.now(),
+        created_at=datetime.now(),
         id: Union[int, None] = None,
     ):
         self.id = id

@@ -11,12 +11,6 @@ class DuplicatedEntry(Exception):
         super().__init__(self.message)
 
 
-class UserNotExist(Exception):
-    def __init__(self):
-        self.message = "User Doesn't Exist"
-        super().__init__(self.message)
-
-
 class WrongCredentials(Exception):
     def __init__(self):
         self.message = "Wrong User Credentials"

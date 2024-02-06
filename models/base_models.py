@@ -3,9 +3,11 @@ import sys
 from enum import Enum
 from typing import Union, Any, List, Dict
 from mysql.connector import Error as dbError
+from mysql.connector import IntegrityError
 
 sys.path.append(os.path.dirname(os.path.dirname(__file__)))
 from database import DatabaseConnection
+from model_exceptions import DuplicatedEntry
 
 
 class Column:
@@ -177,7 +179,7 @@ class BaseModel:
         descending: bool = False,
         limit: int = None,
         offset: int = None,
-    ) -> dict:
+    ) -> List[dict]:
         """Executes select query in the table of model instance.
 
         Returns:
@@ -199,7 +201,7 @@ class BaseModel:
         except dbError as err:
             print(f'Error while fetching from "{cls.name}".')
             print(f"Error description: {err}")
-            return {}
+            return []
         else:
             return results
 
@@ -225,7 +227,10 @@ class BaseModel:
             limit=limit,
             offset=offset,
         )
-        return [cls(**item) for item in results]
+        if results:
+            return [cls(**item) for item in results]
+        else:
+            return results
 
     def get_comma_seperated(self, columns: List[Column]) -> str:
         """Get value of instance attributes as a comma seperated string
@@ -270,6 +275,10 @@ class BaseModel:
         query = f"INSERT INTO {cls.name} ({clm})\nVALUES ({values[:-1]});"
         try:
             _, rowid = self.db_obj.execute(query)
+        except IntegrityError as err:
+            print(f'Error while inserting new row into "{cls.name}".')
+            print(f"Error description: {err}")
+            raise DuplicatedEntry(err.msg)
         except dbError as err:
             print(f'Error while inserting new row into "{cls.name}".')
             print(f"Error description: {err}")
@@ -327,6 +336,8 @@ class BaseModel:
         else:
             return rowcount
 
+    def delete(self, where: str = "default") -> int:
+        pass
 
 class UserRole(Enum):
     ADMIN = "admin"

@@ -585,35 +585,35 @@ class Show(BaseModel):
         )
         return results[0][reserved_seats]
 
-    # Some syntax error in f string creation please fix.
-    # @classmethod
-    # def get_shows_list(cls) -> list['Movie']:
-    #     """returns a list of shows along with related movie (also it's rate) and theater object.
 
-    #     Returns:
-    #         list: List of Movies
-    #     """
-    #     show_id, movie_id, theater_id = 's_id', 'm_id', 't_id'
-    #     sub_query = f"SELECT {Movie.name}.*, {Movie.rate} from {Movie.name} m
-    #                   LEFT JOIN (SELECT {MovieRate.movie_id.name},
-    #                   SUM({MovieRate.rate.name})/COUNT({MovieRate.rate.name}) as {Movie.rate} from {MovieRate.name}
-    #                   GROUP BY {MovieRate.movie_id.name}) rt ON m.{Movie.id.name}=rt.{MovieRate.movie_id.name})"
-    #     query = f"SELECT s.*, s.id as {show_id}, m.*, m.id as {movie_id}, th.*, th.id as {theater_id}
-    #                 FROM {Show.name} s
-    #                 JOIN {sub_query} m ON s.{Show.movie_id.name} = m.{Movie.id.name}
-    #                 JOIN {Theater.name} th ON s.{Show.theater_id.name} = th.{Theater.id.name}
-    #                 WHERE {Show.start_date.name} > now()"
-    #     results = cls.db_obj.execute(query)
-    #     list = []
-    #     for item in results:
-    #         show_obj = cls(item[Show.movie_id.name], item[Show.theater_id.name],
-    #                        item[Show.start_date.name], item[Show.end_date.name], item[Show.price.name], item[show_id])
-    #         show_obj.movie = Movie(item[Movie.m_name.name], item[Movie.duration.name],
-    #                                item[Movie.age_rating.name], item[Movie.screening_number.name], item[movie_id])
-    #         show_obj.theater = Theater(
-    #             item[Theater.tname.name], item[Theater.capacity.name], item[theater_id])
-    #         list.append(show_obj)
-    #     return list
+    @classmethod
+    def get_shows_list(cls) -> list['Movie']:
+        """Returns list of shows along with related movie (also it's rate) and theater objects.
+
+        Returns:
+            list: List of Movies
+        """
+        show_id, movie_id, theater_id, rate = 's_id', 'm_id', 't_id', 'rate'
+        sub_query = f"SELECT m.*, rate from {Movie.name} m \
+                        LEFT JOIN (SELECT {MovieRate.movie_id.name}, \
+                        SUM({MovieRate.rate.name})/COUNT({MovieRate.rate.name}) as {rate} from {MovieRate.name} \
+                        GROUP BY {MovieRate.movie_id.name}) rt ON m.{Movie.id.name}=rt.{MovieRate.movie_id.name})"
+        query = f"SELECT s.*, s.id as {show_id}, m.*, m.id as {movie_id}, th.*, th.id as {theater_id} \
+                    FROM {Show.name} s \
+                    JOIN {sub_query} m ON s.{Show.movie_id.name} = m.{Movie.id.name} \
+                    JOIN {Theater.name} th ON s.{Show.theater_id.name} = th.{Theater.id.name} \
+                    WHERE s.{Show.start_date.name} > now()"
+        results = cls.db_obj.execute(query)
+        list = []
+        for item in results:
+            show_obj = cls(item[Show.movie_id.name], item[Show.theater_id.name],
+                           item[Show.start_date.name], item[Show.end_date.name], item[Show.price.name], item[show_id])
+            show_obj.movie = Movie(item[Movie.m_name.name], item[Movie.duration.name],
+                                   item[Movie.age_rating.name], item[Movie.screening_number.name], item[movie_id])
+            show_obj.theater = Theater(
+                item[Theater.tname.name], item[Theater.capacity.name], item[theater_id])
+            list.append(show_obj)
+        return list
 
 
 class Order(BaseModel):
@@ -654,9 +654,29 @@ class Order(BaseModel):
     def reserve(self):
         self.insert()
 
-    def cancel_order(self):
-        pass
+    def cancel_order(self, user: User, fine: int) -> None:
+        """updates 'user' table set 'wallet' ->  increase the balance equal to ticket price minus the fine
+        and 'order' table set 'cancel_date' -> now.
+
+        Args:
+            user (User): logged in user
+            fine (int): based on the time remaining until the start of the show
+
+        Returns:
+            None
+        """
+        show_price = Show.fetch(select=f'{Show.price}', where=f'{Show.id} = {self.show_id}')[0][Show.price.name]
+        current_date = datetime.now()
+        formatted_date = current_date.strftime("%Y-%m-%d %H:%M:%S")
+        query1 = user.update_query({User.wallet : user.wallet + show_price*((100-fine)/100)})
+        query2 = self.update_query({Order.cancel_date: formatted_date})
+        try:
+            self.db_obj.transaction([query1, query2])
+        except dbError as err:
+            print(f'Error while updating rows in "{self.name}" or "{user.name}.')
+            print(f"Error description: {err}")
 
     @classmethod
-    def get_user_orders(cls):
-        pass
+    def get_user_orders(cls, user):
+        results = Order.fetch_obj(where=f'{Order.user_id.name} = {user.id}', order_by={Order.create_date.name}, descending=True)
+        return results

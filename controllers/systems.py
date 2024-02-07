@@ -35,14 +35,15 @@ class UserManagement:
 
         elif request["type"] == "signup":
             data["role"] = UserRole.USER
-            signup_handler = uHandlers.EmailVerification()
+            signup_handler = uHandlers.UsernameVerification()
+            email = uHandlers.EmailVerification()
             phome_number = uHandlers.PhoneVerification()
             birth_date = uHandlers.BirthDateVerification()
             password_policy = uHandlers.PasswordPolicyVerification()
             create_user = uHandlers.CreateUserHandler()
-            signup_handler.set_next(phome_number).set_next(birth_date).set_next(
-                password_policy
-            ).set_next(create_user)
+            signup_handler.set_next(email).set_next(phome_number).set_next(
+                birth_date
+            ).set_next(password_policy).set_next(create_user)
             user = signup_handler.handle(data)
         else:
             raise cExcept.AuthenticationFaild
@@ -83,10 +84,11 @@ class UserManagement:
 
     @staticmethod
     def edit_profile(data: dict, user: User):
-        handler = uHandlers.EmailVerification()
+        handler = uHandlers.UsernameVerification()
+        email = uHandlers.EmailVerification()
         phone_number = uHandlers.PhoneVerification()
         profile_update = uHandlers.ProfileInfoUpdate()
-        handler.set_next(phone_number).set_next(profile_update)
+        handler.set_next(email).set_next(phone_number).set_next(profile_update)
         try:
             handler.handle(data)
             user_info = UserManagement.get_safe_user_info(user)

@@ -12,6 +12,19 @@ from models.model_exceptions import DuplicatedEntry, WrongCredentials
 from utils.utils import hash_password
 
 
+class UsernameVerification(AbstractHandler):
+    def handle(self, data: Any) -> Any | None:
+        username = data["username"]
+        if (
+            len(username) > 100
+            or not re.search(r"[A-Z]", username)
+            or not re.search(r"[a-z]", username)
+            or not re.search(r"\d", username)
+        ):
+            raise InvalidUserInfo("Please enter a username with the correct format!")
+        return super().handle(data)
+
+
 class EmailVerification(AbstractHandler):
     def handle(self, data: Any) -> Any | None:
         email_pattern = re.compile(r"^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$")

@@ -343,7 +343,24 @@ class BaseModel:
             return rowcount
 
     def delete(self, where: str = "default") -> int:
-        pass
+        query = f"DELETE FROM {self.name} WHERE"
+        if where == "default":
+            cls = self.__class__
+            obj_dict = self.__dict__
+            pks = cls.get_primary_keys()
+            for pk in pks:
+                query = f'{query} {pk.name}="{obj_dict[pk.name]}" AND'
+            query = f"{query[:-4]};"
+        else:
+            query = f"{query} {where}"
+        try:
+            rowcount, _ = self.db_obj.execute(query)
+        except dbError as err:
+            print(f'Error delete "{self.name}".')
+            print(f"Error description: {err}")
+            return 0
+        else:
+            return rowcount
 
 
 class UserRole(Enum):

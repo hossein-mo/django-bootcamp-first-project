@@ -30,8 +30,8 @@ class AbstractHandler(Handler):
         return handler
 
     @abstractmethod
-    def handle(self, data: dict) -> dict:
+    def handle(self, data: Any) -> Optional[Any]:
         if self._next_handler:
-            return super().handle(data)
-        else:
-            return data
+            return self._next_handler.handle(data)
+
+        return None

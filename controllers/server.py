@@ -14,35 +14,53 @@ from controllers.systems import UserManagement
 class TCPServer:
     HOST: str
     PORT: int
-    BUFSIZE: int
+    SIZE_BYTES_LENGTH: int
 
-    def __init__(self, host: str, port: int, bufsize: int) -> None:
+    def __init__(self, host: str, port: int, size_length: int = 4) -> None:
         self.HOST = host
         self.PORT = port
-        self.BUFSIZE = bufsize
+        self.SIZE_BYTES_LENGTH = size_length
 
     @staticmethod
-    def client_handler(client_socket: socket.socket, bufsize):
-        request = client_socket.recv(bufsize)
-        request = pickle.loads(request)
-        response, user = UserManagement.client_authenticatation(request)
-        client_socket.sendall(pickle.dumps(response))
+    def socket_recive(client_socket: socket.socket, size_length: int):
+        size = client_socket.recv(size_length)
+        size = int.from_bytes(size, byteorder="big")
+        request = client_socket.recv(size)
+        if request:
+            return pickle.loads(request)
+        else:
+            return None
+
+    @staticmethod
+    def socket_send(client_socket: socket.socket, response: dict, size_length: int):
+        response = pickle.dumps(response)
+        size_bytes = len(response).to_bytes(size_length, byteorder="big")
+        client_socket.sendall(size_bytes + response)
+
+    @staticmethod
+    def client_handler(client_socket: socket.socket, size_length: int):
+        request = TCPServer.socket_recive(client_socket, size_length)
+        if "type" in request:
+            response, user = UserManagement.client_authenticatation(request)
+        else:
+            user = None
+            response = create_response(False, 'user', 'Please login.')
+        TCPServer.socket_send(client_socket, response, size_length)
         if user:
             while True:
-                request = client_socket.recv(bufsize)
+                request = TCPServer.socket_recive(client_socket, size_length)
                 if not request:
                     break
-                request = pickle.loads(request)
                 if request["type"] == "profile":
                     if request["subtype"] == "update":
                         response, user = UserManagement.edit_profile(
                             request["data"], user
                         )
                     if request["subtype"] == "changepass":
-                        response.user = UserManagement.change_password(
+                        response, user = UserManagement.change_password(
                             request["data"], user
                         )
-                client_socket.sendall(pickle.dumps(response))
+                TCPServer.socket_send(client_socket, response, size_length)
 
         client_socket.close()
 
@@ -53,14 +71,12 @@ class TCPServer:
         print(f"Server listening on port {self.PORT}")
         while True:
             client, addr = server.accept()
-            print(type(addr[0]), type(addr[1]))
-            print(client.__class__)
             client_handler = threading.Thread(
-                target=TCPServer.client_handler, args=(client, self.BUFSIZE)
+                target=TCPServer.client_handler, args=(client, self.SIZE_BYTES_LENGTH)
             )
             client_handler.start()
 
 
 if __name__ == "__main__":
-    server = TCPServer("localhost", 8000, 4096)
+    server = TCPServer("localhost", 8000)
     server.start_server()

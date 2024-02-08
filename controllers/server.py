@@ -25,7 +25,12 @@ class TCPServer:
     def socket_recive(client_socket: socket.socket, size_length: int):
         size = client_socket.recv(size_length)
         size = int.from_bytes(size, byteorder="big")
-        request = client_socket.recv(size)
+        request = b""
+        while len(request) < size:
+            chunk = client_socket.recv(size - len(request))
+            if not chunk:
+                break
+            request += chunk
         if request:
             return pickle.loads(request)
         else:
@@ -44,7 +49,7 @@ class TCPServer:
             response, user = UserManagement.client_authenticatation(request)
         else:
             user = None
-            response = create_response(False, 'user', 'Please login.')
+            response = create_response(False, "user", "Please login.")
         TCPServer.socket_send(client_socket, response, size_length)
         if user:
             while True:

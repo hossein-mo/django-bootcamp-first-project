@@ -213,8 +213,11 @@ class BankAccount(BaseModel):
         self.update({BankAccount.balance: self.balance})
 
     def withdraw(self, amount: int) -> None:
-        self.balance -= amount
-        self.update({BankAccount.balance: self.balance})
+        if amount > self.balance:
+            raise NotEnoughBalance
+        else:
+            self.balance -= amount
+            self.update({BankAccount.balance: self.balance})
 
     def transfer(self, other: "BankAccount", amount: int):
         """Transfer amount from instance balance to destination instance balance.

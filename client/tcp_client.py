@@ -15,11 +15,15 @@ class TCPClient:
         self.client_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.client_socket.connect((self.host, self.port))
 
-    def recive(self) -> dict:
+    def recive(self) -> dict | None:
         size = self.client_socket.recv(self.size_bytes_length)
         size = int.from_bytes(size, byteorder="big")
-        response = b""
-        response = self.client_socket.recv(size)
+        response=b''
+        while len(response) < size:
+            chunk = self.client_socket.recv(size - len(response))
+            if not chunk:
+                break
+            response += chunk
         if response:
             return pickle.loads(response)
         else:

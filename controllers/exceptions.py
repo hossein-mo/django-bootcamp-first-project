@@ -38,3 +38,9 @@ class NotAuthorized(Exception):
     def __init__(self, message: str = "User not authorized to do this."):
         self.message = message
         super().__init__(self.message)
+        
+class NotEnoughBalance(Exception):
+
+    def __init__(self) -> None:
+        """Exception to raise when balance is not enough"""
+        super().__init__("Not enough balance.")

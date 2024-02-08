@@ -2,7 +2,7 @@ import os
 import sys
 from datetime import datetime, date
 from mysql.connector import Error as dbError
-from typing import Union, Dict
+from typing import Union, Dict, List
 from abc import ABC, abstractmethod
 
 sys.path.append(os.path.dirname(os.path.dirname(__file__)))
@@ -10,7 +10,6 @@ sys.path.append(os.path.dirname(os.path.dirname(__file__)))
 from utils.utils import hash_password
 from models.base_models import Column, UserRole, BaseModel
 from models.model_exceptions import (
-    NotEnoughBalance,
     WrongCredentials,
     DuplicatedEntry,
 )
@@ -23,7 +22,7 @@ class User(BaseModel):
     password = Column("password", "CHAR(64)")
     email = Column("email", "VARCHAR(255)", unique=True)
     phone_number = Column("phone_number", "VARCHAR(255)", null=True)
-    wallet = Column("wallet", "INT UNSIGNED")
+    balance = Column("balance", "INT UNSIGNED")
     role = Column(
         "role", f"ENUM({UserRole.get_comma_seperated()})", default=UserRole.USER.value
     )
@@ -37,7 +36,7 @@ class User(BaseModel):
         password: str,
         email: str,
         phone_number: str,
-        wallet: int,
+        balance: int,
         role: Union[str, UserRole],
         birth_date: date,
         register_date: datetime,
@@ -51,7 +50,7 @@ class User(BaseModel):
             password (str): user password
             email (str): user email
             phone_number (str): user phone_number
-            wallet (int): user wallet
+            balance (int): user wallet balance
             role (Union[str, UserRole]): user role
             birth_date (date): user birth_date
             register_date (datetime): user register_date
@@ -67,7 +66,7 @@ class User(BaseModel):
         self.register_date = register_date
         self.last_login = last_login
         self.phone_number = phone_number
-        self.wallet = wallet
+        self.balance = balance
 
     def update_last_login(self) -> None:
         """Updated the last login time of the user in database to now"""
@@ -187,9 +186,6 @@ class BankAccount(BaseModel):
         self.balance = balance
         self.user_id = user_id
 
-    def delete(self):
-        self.delete()
-
     def update(self):
         self.update(
             {
@@ -200,44 +196,40 @@ class BankAccount(BaseModel):
         )
 
     @staticmethod
-    def add_new_account(account: "BankAccount"):
-        account.insert()
-
-    def deposit(self, amount: int) -> None:
+    def deposit(account: Union[User, 'BankAccount'], amount: int) -> None:
         """Add amount to user's balance and update database.
 
         Args:
             amount (int): amount to deposit
         """
-        self.balance += amount
-        self.update({BankAccount.balance: self.balance})
+        acc_cls = account.__class__
+        account.update({acc_cls.balance: account.balance + amount})
+        account.balance += amount
 
-    def withdraw(self, amount: int) -> None:
-        self.balance -= amount
-        self.update({BankAccount.balance: self.balance})
+    @staticmethod
+    def withdraw(account: Union[User, 'BankAccount'], amount: int) -> None:
+        acc_cls = account.__class__
+        account.update({acc_cls.balance: account.balance - amount})
+        account.balance -= amount
 
-    def transfer(self, other: "BankAccount", amount: int):
+    @staticmethod
+    def transfer(origin: Union[User, 'BankAccount'], dest: Union[User, 'BankAccount'], amount: int):
         """Transfer amount from instance balance to destination instance balance.
 
         Args:
             other (BankAccount): destination account
             amount (int): amount of transfer
-
-        Raises:
-            NotEnoughBalance: if amount > origin account balance.
         """
-        if amount > self.balance:
-            raise NotEnoughBalance
-        else:
-            self.balance -= amount
-            other.balance += amount
-            query1 = self.update_query({BankAccount.balance: self.balance})
-            query2 = other.update_query({BankAccount.balance: other.balance})
-            try:
-                self.db_obj.transaction([query1, query2])
-            except dbError as err:
-                print(f'Error while updating rows in "{self.name}".')
-                print(f"Error description: {err}")
+        origin_cls = origin.__class__
+        dest_cls = dest.__class__
+        query1 = origin.update_query({origin_cls.balance: origin.balance - amount})
+        query2 = dest.update_query({dest_cls.balance: dest.balance + amount})
+        try:
+            origin_cls.db_obj.transaction([query1, query2])
+            origin.balance -= amount
+            dest.balance += amount
+        except dbError as err:
+            print(f"Error description: {err}")
 
     @classmethod
     def create_new(
@@ -452,7 +444,7 @@ class UserSubscription(BaseModel):
             )
 
         queries.append(
-            f"UPDATE {User.name} SET {User.wallet.name}={User.wallet.name} - {price} WHERE {User.id.name} = {user.id}"
+            f"UPDATE {User.name} SET {User.balance.name}={User.balance.name} - {price} WHERE {User.id.name} = {user.id}"
         )
         queries.append(
             f"INSERT INTO {UserSubscription.name} VALUES ({user.id}, {subscription.id}, NOW(), DATE_ADD(NOW(), INTERVAL {duration} DAY))"
@@ -585,15 +577,14 @@ class Show(BaseModel):
         )
         return results[0][reserved_seats]
 
-
     @classmethod
-    def get_shows_list(cls) -> list['Movie']:
+    def get_shows_list(cls) -> list["Movie"]:
         """Returns list of shows along with related movie (also it's rate) and theater objects.
 
         Returns:
             list: List of Movies
         """
-        show_id, movie_id, theater_id, rate = 's_id', 'm_id', 't_id', 'rate'
+        show_id, movie_id, theater_id, rate = "s_id", "m_id", "t_id", "rate"
         sub_query = f"SELECT m.*, rate from {Movie.name} m \
                         LEFT JOIN (SELECT {MovieRate.movie_id.name}, \
                         SUM({MovieRate.rate.name})/COUNT({MovieRate.rate.name}) as {rate} from {MovieRate.name} \
@@ -606,12 +597,24 @@ class Show(BaseModel):
         results = cls.db_obj.execute(query)
         list = []
         for item in results:
-            show_obj = cls(item[Show.movie_id.name], item[Show.theater_id.name],
-                           item[Show.start_date.name], item[Show.end_date.name], item[Show.price.name], item[show_id])
-            show_obj.movie = Movie(item[Movie.m_name.name], item[Movie.duration.name],
-                                   item[Movie.age_rating.name], item[Movie.screening_number.name], item[movie_id])
+            show_obj = cls(
+                item[Show.movie_id.name],
+                item[Show.theater_id.name],
+                item[Show.start_date.name],
+                item[Show.end_date.name],
+                item[Show.price.name],
+                item[show_id],
+            )
+            show_obj.movie = Movie(
+                item[Movie.m_name.name],
+                item[Movie.duration.name],
+                item[Movie.age_rating.name],
+                item[Movie.screening_number.name],
+                item[movie_id],
+            )
             show_obj.theater = Theater(
-                item[Theater.tname.name], item[Theater.capacity.name], item[theater_id])
+                item[Theater.tname.name], item[Theater.capacity.name], item[theater_id]
+            )
             list.append(show_obj)
         return list
 
@@ -655,7 +658,7 @@ class Order(BaseModel):
         self.insert()
 
     def cancel_order(self, user: User, fine: int) -> None:
-        """updates 'user' table set 'wallet' ->  increase the balance equal to ticket price minus the fine
+        """updates 'user' table set 'balance' ->  increase the balance equal to ticket price minus the fine
         and 'order' table set 'cancel_date' -> now.
 
         Args:
@@ -665,10 +668,14 @@ class Order(BaseModel):
         Returns:
             None
         """
-        show_price = Show.fetch(select=f'{Show.price}', where=f'{Show.id} = {self.show_id}')[0][Show.price.name]
+        show_price = Show.fetch(
+            select=f"{Show.price}", where=f"{Show.id} = {self.show_id}"
+        )[0][Show.price.name]
         current_date = datetime.now()
         formatted_date = current_date.strftime("%Y-%m-%d %H:%M:%S")
-        query1 = user.update_query({User.wallet : user.wallet + show_price*((100-fine)/100)})
+        query1 = user.update_query(
+            {User.balance: user.balance + show_price * ((100 - fine) / 100)}
+        )
         query2 = self.update_query({Order.cancel_date: formatted_date})
         try:
             self.db_obj.transaction([query1, query2])
@@ -678,5 +685,9 @@ class Order(BaseModel):
 
     @classmethod
     def get_user_orders(cls, user):
-        results = Order.fetch_obj(where=f'{Order.user_id.name} = {user.id}', order_by={Order.create_date.name}, descending=True)
+        results = Order.fetch_obj(
+            where=f"{Order.user_id.name} = {user.id}",
+            order_by={Order.create_date.name},
+            descending=True,
+        )
         return results

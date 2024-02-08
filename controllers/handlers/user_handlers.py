@@ -12,8 +12,21 @@ from models.model_exceptions import DuplicatedEntry, WrongCredentials
 from utils.utils import hash_password
 
 
+class UsernameVerification(AbstractHandler):
+    def handle(self, data: dict) -> dict | None:
+        username = data["username"]
+        if (
+            len(username) > 100
+            or not re.search(r"[A-Z]", username)
+            or not re.search(r"[a-z]", username)
+            or not re.search(r"\d", username)
+        ):
+            raise InvalidUserInfo("Please enter a username with the correct format!")
+        return super().handle(data)
+
+
 class EmailVerification(AbstractHandler):
-    def handle(self, data: Any) -> Any | None:
+    def handle(self, data: dict) -> dict | None:
         email_pattern = re.compile(r"^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$")
         if not bool(email_pattern.match(data["email"])):
             raise InvalidUserInfo(
@@ -23,7 +36,7 @@ class EmailVerification(AbstractHandler):
 
 
 class PhoneVerification(AbstractHandler):
-    def handle(self, data: Any) -> Any | None:
+    def handle(self, data: dict) -> dict | None:
         phone_pattern = re.compile(r"^(09[0-3][0-9]-?[0-9]{3}-?[0-9]{4})$")
         if not bool(phone_pattern.match(data["phone_number"])) and not None:
             raise InvalidUserInfo(
@@ -33,7 +46,7 @@ class PhoneVerification(AbstractHandler):
 
 
 class BirthDateVerification(AbstractHandler):
-    def handle(self, data: Any) -> Any | None:
+    def handle(self, data: dict) -> dict | None:
         birth_date_pattern = re.compile(r"^\d{4}-\d{2}-\d{2}$")
         if not bool(birth_date_pattern.match(data["birth_date"])):
             raise InvalidUserInfo(
@@ -54,7 +67,7 @@ class PasswordPolicyVerification(AbstractHandler):
 
         super().__init__()
 
-    def handle(self, data: Dict[str, str]):
+    def handle(self, data: dict):
         password = data["password"]
         special_char_count = len(re.findall(r"[#@\$&]", password))
         if special_char_count < 2:
@@ -69,35 +82,37 @@ class PasswordPolicyVerification(AbstractHandler):
 
 
 class CreateUserHandler(AbstractHandler):
-    def handle(self, data: Any) -> User | None:
+    def handle(self, data: dict) -> dict:
         try:
             user = User.create_new(**data)
+            data["user"] = user
         except DuplicatedEntry as err:
             raise
         if self._next_handler:
             return super().handle(data)
         else:
-            return user
+            return data
 
 
 class ChangePassword(AbstractHandler):
-    def handle(self, data: Any, user: User) -> User | None:
+    def handle(self, data: dict) -> dict | None:
         password = data["password"]
         old_password = data["old_password"]
-        user = data["user_obj"]
+        user = data["user"]
         if hash_password(old_password) == user.password:
             user.update({User.password: hash_password(password)})
         if self._next_handler:
             return super().handle(data)
         else:
-            return user
+            return data
 
 
 class ProfileInfoUpdate(AbstractHandler):
-    def handle(self, data: Any, user: User) -> User | None:
+    def handle(self, data: dict) -> dict | None:
         new_username = data["username"]
         new_email = data["email"]
         new_phone_number = data["phone_number"]
+        user = data["user"]
         try:
             user.update(
                 {
@@ -111,17 +126,39 @@ class ProfileInfoUpdate(AbstractHandler):
         if self._next_handler:
             return super().handle(data)
         else:
-            return user
+            return data
 
 
 class LoginHandler(AbstractHandler):
-    def handle(self, data: Any) -> User | None:
+    def handle(self, data: dict) -> dict | None:
         try:
             user = User.autenthicate(data)
+            user.update_last_login()
+            data["user"] = user
         except WrongCredentials as err:
             raise
         else:
             if self._next_handler:
                 return super().handle(data)
             else:
-                return user
+                return data
+
+
+class ChangeUserRole(AbstractHandler):
+    def handle(self, data: dict) -> dict | None:
+        if "username" in data:
+            username = data["username"]
+            affected_user = User.fetch_obj(where=f'{User.username}="{username}"')
+        elif "email" in data:
+            email = data["email"]
+            affected_user = User.fetch_obj(where=f'{User.email}="{email}"')
+        if affected_user:
+            affected_user = affected_user[0]
+            affected_user.role = data['new_role']
+            affected_user.update({User.role, affected_user.role})
+        else:
+            raise InvalidUserInfo('User not found')
+        if self._next_handler:
+            return super().handle(data)
+        else:
+            return data

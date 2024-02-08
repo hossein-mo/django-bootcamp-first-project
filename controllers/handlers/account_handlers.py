@@ -51,11 +51,11 @@ class Objectify(AbstractHandler):
 
 class BalanceCheck(AbstractHandler):
     def handle(self, data: dict) -> dict:
-        if data['origin'] == 'deposit':
+        if data['origin'] != 'deposit':
             amount = data["amount"]
             origin = data["origin"]
-        if amount > origin.balance:
-            raise NotEnoughBalance
+            if amount > origin.balance:
+                raise NotEnoughBalance
         if self._next_handler:
             return super().handle(data)
         else:
@@ -77,10 +77,11 @@ class AccountCredentialsCheck(AbstractHandler):
 class TransferHandler(AbstractHandler):
     def handle(self, data: dict) -> dict:
         if data['origin'] == 'deposit':
-            pass
+            status = BankAccount.deposit(data['dest'], data['amount'])
         elif data['dest'] == 'withdrawal':
-            pass
-        status = BankAccount.transfer(data['origin'], data['dest'], data['amount'])
+            status = BankAccount.withdraw(data['origin'], data['amount'])
+        else:
+            status = BankAccount.transfer(data['origin'], data['dest'], data['amount'])
         data['status'] = status
         if self._next_handler:
             return super().handle(data)

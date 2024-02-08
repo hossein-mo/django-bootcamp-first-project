@@ -5,7 +5,7 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(__file__))))
 from controllers.exceptions import NotAuthorized
 
 
-def authorize(authorized_roles: dict):
+def authorize(authorized_roles: set):
     def decorator(func):
         def wrapper(user, *args, **kwargs):
             if user.role in authorized_roles:

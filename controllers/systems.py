@@ -8,6 +8,7 @@ import controllers.exceptions as cExcept
 import models.model_exceptions as mExcept
 from models.models import User
 from models.base_models import UserRole
+from controllers.autorization import authorize
 from utils.utils import create_response
 
 
@@ -26,25 +27,35 @@ class UserManagement:
         }
 
     @staticmethod
-    def authenticate(request):
+    def login(data: dict):
+        login_handler = uHandlers.LoginHandler()
+        user = login_handler.handle(data)
+        return user
+
+    @staticmethod
+    def sign_up(data: dict, role: UserRole):
+        data["role"] = role
+        signup_handler = uHandlers.UsernameVerification()
+        email = uHandlers.EmailVerification()
+        phome_number = uHandlers.PhoneVerification()
+        birth_date = uHandlers.BirthDateVerification()
+        password_policy = uHandlers.PasswordPolicyVerification()
+        create_user = uHandlers.CreateUserHandler()
+        signup_handler.set_next(email).set_next(phome_number).set_next(
+            birth_date
+        ).set_next(password_policy).set_next(create_user)
+        user = signup_handler.handle(data)
+        return user
+
+
+    @staticmethod
+    def authenticate(request: dict, role: UserRole = UserRole.USER):
         data = request["data"]
         print(request)
         if request["type"] == "login":
-            login_handler = uHandlers.LoginHandler()
-            user = login_handler.handle(data)
-
+            user = UserManagement.login(data)
         elif request["type"] == "signup":
-            data["role"] = UserRole.USER
-            signup_handler = uHandlers.UsernameVerification()
-            email = uHandlers.EmailVerification()
-            phome_number = uHandlers.PhoneVerification()
-            birth_date = uHandlers.BirthDateVerification()
-            password_policy = uHandlers.PasswordPolicyVerification()
-            create_user = uHandlers.CreateUserHandler()
-            signup_handler.set_next(email).set_next(phome_number).set_next(
-                birth_date
-            ).set_next(password_policy).set_next(create_user)
-            user = signup_handler.handle(data)
+            user = UserManagement.sign_up(data, role)
         else:
             raise cExcept.AuthenticationFaild
         return user
@@ -122,3 +133,12 @@ class UserManagement:
             response = create_response(False, "user", "Invalid password!", {})
         finally:
             return response, user
+
+    @staticmethod
+    def create_admin(userdata: dict):
+        return UserManagement.sign_up(userdata, role=UserRole.ADMIN)
+    
+    @staticmethod
+    @authorize(authorized_roles={UserRole.ADMIN})
+    def change_user_role (user: User, user_to_change_role: dict, new_role: str):
+        pass

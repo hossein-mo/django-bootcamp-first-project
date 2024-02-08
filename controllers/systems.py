@@ -22,7 +22,7 @@ class UserManagement:
             "birth_date": user.birth_date,
             "last_login": user.last_login,
             "register_date": user.register_date,
-            "wallet": user.wallet,
+            "balance": user.balance,
             "role": user.role.value,
         }
 
@@ -78,7 +78,7 @@ class UserManagement:
         except cExcept.InvalidUserInfo as err:
             print(err)
             response = create_response(False, "user", "Invalid user info!")
-        except cExcept.PasswordPolicyNotPares:
+        except cExcept.PasswordPolicyNotPassed:
             response = create_response(False, "user", "Invalid password!")
         except mExcept.DuplicatedEntry as err:
             print(err)
@@ -93,6 +93,7 @@ class UserManagement:
 
     @staticmethod
     def edit_profile(data: dict, user: User):
+        data['user'] = user
         handler = uHandlers.UsernameVerification()
         email = uHandlers.EmailVerification()
         phone_number = uHandlers.PhoneVerification()

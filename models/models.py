@@ -205,15 +205,17 @@ class BankAccount(BaseModel):
         acc_cls = account.__class__
         account.update({acc_cls.balance: account.balance + amount})
         account.balance += amount
+        return True
 
     @staticmethod
     def withdraw(account: Union[User, 'BankAccount'], amount: int) -> None:
         acc_cls = account.__class__
         account.update({acc_cls.balance: account.balance - amount})
         account.balance -= amount
+        return True
 
     @staticmethod
-    def transfer(origin: Union[User, 'BankAccount'], dest: Union[User, 'BankAccount'], amount: int):
+    def transfer(origin: Union[User, 'BankAccount'], dest: Union[User, 'BankAccount'], amount: int) -> bool:
         """Transfer amount from instance balance to destination instance balance.
 
         Args:
@@ -228,8 +230,10 @@ class BankAccount(BaseModel):
             origin_cls.db_obj.transaction([query1, query2])
             origin.balance -= amount
             dest.balance += amount
+            return True
         except dbError as err:
             print(f"Error description: {err}")
+            return False
 
     @classmethod
     def create_new(

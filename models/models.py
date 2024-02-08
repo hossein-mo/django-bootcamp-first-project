@@ -2,7 +2,7 @@ import os
 import sys
 from datetime import datetime, date
 from mysql.connector import Error as dbError
-from typing import Union, Dict
+from typing import Union, Dict, List
 from abc import ABC, abstractmethod
 
 sys.path.append(os.path.dirname(os.path.dirname(__file__)))
@@ -186,9 +186,6 @@ class BankAccount(BaseModel):
         self.password = password
         self.balance = balance
         self.user_id = user_id
-
-    def delete(self):
-        self.delete()
 
     def update(self):
         self.update(

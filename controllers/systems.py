@@ -151,6 +151,8 @@ class AccountManagement:
             return create_response(True, 'account', "Bank account has been added to your profile.", data['card_info'])
         except KeyError as err:
             return create_response(False, 'account', "Invalid card info.")
+        except TypeError as err:
+            return create_response(False, 'account', "Invalid card info.")
             
 
     # @staticmethod

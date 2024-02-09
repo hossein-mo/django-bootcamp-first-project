@@ -5,6 +5,6 @@ class DuplicatedEntry(Exception):
 
 
 class WrongCredentials(Exception):
-    def __init__(self):
-        self.message = "Wrong User Credentials"
+    def __init__(self, message: str = "Wrong User Credentials"):
+        self.message = message
         super().__init__(self.message)

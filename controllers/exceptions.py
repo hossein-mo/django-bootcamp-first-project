@@ -17,7 +17,7 @@ class UpdateFailed(Exception):
 
 
 class PasswordPolicyNotPassed(Exception):
-    def __init__(self, message: str = "Password policy verfication failed."):
+    def __init__(self, message: str = "Invalid password format."):
         self.message = message
         super().__init__(self.message)
 

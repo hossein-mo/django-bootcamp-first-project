@@ -5,16 +5,10 @@ from mysql.connector import pooling
 from typing import List, Tuple
 
 sys.path.append(os.path.dirname(os.path.dirname(__file__)))
-from meta import SingletonMeta
+from models.meta import SingletonMeta
 
 
 class DatabaseConnection(metaclass=SingletonMeta):
-    HOST = "localhost"
-    PORT = "3306"
-    USER = "root"
-    PASSWORD = "pass"
-    DB_NAME = "pytonilia_db"
-    POOL_SIZE = 5
 
     def create_db_if_not_exist(self, db_config: dict) -> None:
         """Create database if it doesn't exist.
@@ -24,33 +18,47 @@ class DatabaseConnection(metaclass=SingletonMeta):
         """
         with mysql.connector.connect(**db_config) as connection:
             cursor = connection.cursor()
-            cursor.execute(f'SHOW DATABASES LIKE "{self.DB_NAME}";')
+            cursor.execute(f'SHOW DATABASES LIKE "{self.db_name}";')
             database_exists = cursor.fetchone()
             if not database_exists:
-                cursor.execute(f"CREATE DATABASE {self.DB_NAME};")
+                cursor.execute(f"CREATE DATABASE {self.db_name};")
             connection.commit()
             cursor.close()
 
-    def __init__(self, db_name: str = DB_NAME) -> None:
+    def __init__(
+        self,
+        host: str = "localhost",
+        port: str = "3306",
+        user: str = "root",
+        password: str = "pass",
+        db_name: str = "pytonilia_db",
+        pool_size: int = 5,
+    ) -> None:
         """Constructor for DatabaseConnection class
 
         Args:
             db_name (str, optional): database name. Defaults to DB_NAME.
         """
+        self.host = host
+        self.port = port
+        self.user = user
+        self.password = password
+        self.db_name = db_name
+        self.pool_size = pool_size
         self.__dbconfig = {
-            "host": self.HOST,
-            "port": self.PORT,
-            "user": self.USER,
-            "password": self.PASSWORD,
+            "host": self.host,
+            "port": self.port,
+            "user": self.user,
+            "password": self.password,
         }
         try:
             self.create_db_if_not_exist(self.__dbconfig)
         except mysql.connector.Error as err:
             print(f"Error: {err}")
         else:
-            self.__dbconfig["database"] = self.DB_NAME
+            self.__dbconfig["database"] = self.db_name
             self.pool = pooling.MySQLConnectionPool(
-                pool_size=self.POOL_SIZE, pool_reset_session=True, **self.__dbconfig
+                pool_size=self.pool_size, pool_reset_session=True, **self.__dbconfig
             )
 
     def execute(self, query: str) -> Tuple[int]:

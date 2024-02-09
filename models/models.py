@@ -1,13 +1,18 @@
-from base_models import Column, UserRole, BaseModel
-from datetime import datetime, date
-from typing import Union
 import os
 import sys
-from model_exceptions import NotEnoughBalance
+from datetime import datetime, date
 from mysql.connector import Error as dbError
+from typing import Union, Dict, List
+from abc import ABC, abstractmethod
 
 sys.path.append(os.path.dirname(os.path.dirname(__file__)))
+
 from utils.utils import hash_password
+from models.base_models import Column, UserRole, BaseModel
+from models.model_exceptions import (
+    WrongCredentials,
+    DuplicatedEntry,
+)
 
 
 class User(BaseModel):
@@ -17,7 +22,7 @@ class User(BaseModel):
     password = Column("password", "CHAR(64)")
     email = Column("email", "VARCHAR(255)", unique=True)
     phone_number = Column("phone_number", "VARCHAR(255)", null=True)
-    wallet = Column("wallet", "INT UNSIGNED")
+    balance = Column("balance", "INT UNSIGNED")
     role = Column(
         "role", f"ENUM({UserRole.get_comma_seperated()})", default=UserRole.USER.value
     )
@@ -31,7 +36,7 @@ class User(BaseModel):
         password: str,
         email: str,
         phone_number: str,
-        wallet: int,
+        balance: int,
         role: Union[str, UserRole],
         birth_date: date,
         register_date: datetime,
@@ -45,7 +50,7 @@ class User(BaseModel):
             password (str): user password
             email (str): user email
             phone_number (str): user phone_number
-            wallet (int): user wallet
+            balance (int): user wallet balance
             role (Union[str, UserRole]): user role
             birth_date (date): user birth_date
             register_date (datetime): user register_date
@@ -61,7 +66,54 @@ class User(BaseModel):
         self.register_date = register_date
         self.last_login = last_login
         self.phone_number = phone_number
-        self.wallet = wallet
+        self.balance = balance
+
+    def info(self) -> dict:
+        return {
+            "username": self.username,
+            "email": self.email,
+            "phone_number": self.phone_number,
+            "birth_date": self.birth_date,
+            "last_login": self.last_login,
+            "register_date": self.register_date,
+            "balance": self.balance,
+            "role": self.role.value,
+        }
+
+    def update_last_login(self) -> None:
+        """Updated the last login time of the user in database to now"""
+        self.last_login = datetime.now()
+        self.update({User.last_login: self.last_login})
+
+    @staticmethod
+    def autenthicate(usercred: Dict[str, str]) -> "User":
+        """_summary_
+
+        Args:
+            username (str): username
+            password (str): password
+
+        Raises:
+            UserNotExist: if user with input username dosen't exist in database
+            WrongCredentials: if input password doesn't match the user password
+
+        Returns:
+            User: autenthicated user
+        """
+        password = hash_password(usercred["password"])
+        if "username" in usercred:
+            user = User.fetch_obj(where=f'{User.username} = "{usercred["username"]}"')
+        else:
+            user = User.fetch_obj(where=f'{User.email} = "{usercred["email"]}"')
+        if not user:
+            print("user doesn't exist")
+            raise WrongCredentials
+        else:
+            user = user[0]
+            if user.password != password:
+                print("wrong password")
+                raise WrongCredentials
+            return user
 
     @classmethod
     def create_new(
@@ -71,9 +123,7 @@ class User(BaseModel):
         email: str,
         phone_number: str,
         role: Union[str, UserRole],
-        birth_date: date,
-        register_date: datetime,
-        last_login: datetime,
+        birth_date: Dict[str, int],
     ) -> "User":
         """_summary_
 
@@ -84,26 +134,31 @@ class User(BaseModel):
             phone_number (str): user phone_number
             role (Union[str, UserRole]): user role
             birth_date (date): user birth_date
-            register_date (datetime): user register_date
-            last_login (datetime): user last_login
 
         Returns:
             User: return a User instance with specified inputs with \
                 wallet balance set to zero and hashed password.
         """
         password = hash_password(password)
-        wallet = 0
-        return cls(
+        rightnow = datetime.now()
+        user = cls(
             username,
             password,
             email,
             phone_number,
-            wallet,
+            0,
             role,
             birth_date,
-            register_date,
-            last_login,
+            rightnow,
+            rightnow,
         )
+        try:
+            user.insert()
+        except DuplicatedEntry as err:
+            print("entered username or email is taken")
+            raise
+        else:
+            return user
 
 
 class BankAccount(BaseModel):
@@ -143,37 +198,65 @@ class BankAccount(BaseModel):
         self.balance = balance
         self.user_id = user_id
 
-    def deposit(self, amount: int) -> None:
+    def info(self) -> dict:
+        return {
+            "id": self.id,
+            "card_number": self.card_number,
+            "balance": self.balance,
+        }
+
+    def update(self):
+        self.update(
+            {
+                BankAccount.card_number: self.card_number,
+                BankAccount.cvv2: self.cvv2,
+                BankAccount.password: self.password,
+            }
+        )
+
+    @staticmethod
+    def deposit(account: Union[User, "BankAccount"], amount: int) -> None:
         """Add amount to user's balance and update database.
 
         Args:
             amount (int): amount to deposit
         """
-        self.balance += amount
-        self.update({BankAccount.balance: self.balance})
+        acc_cls = account.__class__
+        account.update({acc_cls.balance: account.balance + amount})
+        account.balance += amount
+        return True
 
-    def transfer(self, other: "BankAccount", amount: int):
+    @staticmethod
+    def withdraw(account: Union[User, "BankAccount"], amount: int) -> None:
+        acc_cls = account.__class__
+        account.update({acc_cls.balance: account.balance - amount})
+        account.balance -= amount
+        return True
+
+    @staticmethod
+    def transfer(
+        origin: Union[User, "BankAccount"],
+        dest: Union[User, "BankAccount"],
+        amount: int,
+    ) -> bool:
         """Transfer amount from instance balance to destination instance balance.
 
         Args:
             other (BankAccount): destination account
             amount (int): amount of transfer
-
-        Raises:
-            NotEnoughBalance: if amount > origin account balance.
         """
-        if amount > self.balance:
-            raise NotEnoughBalance
-        else:
-            self.balance -= amount
-            other.balance += amount
-            query1 = self.update_query({BankAccount.balance: self.balance})
-            query2 = other.update_query({BankAccount.balance: other.balance})
-            try:
-                self.db_obj.transaction([query1, query2])
-            except dbError as err:
-                print(f'Error while updating rows in "{self.name}".')
-                print(f"Error description: {err}")
+        origin_cls = origin.__class__
+        dest_cls = dest.__class__
+        query1 = origin.update_query({origin_cls.balance: origin.balance - amount})
+        query2 = dest.update_query({dest_cls.balance: dest.balance + amount})
+        try:
+            origin_cls.db_obj.transaction([query1, query2])
+            origin.balance -= amount
+            dest.balance += amount
+            return True
+        except dbError as err:
+            print(f"Error description: {err}")
+            return False
 
     @classmethod
     def create_new(
@@ -193,3 +276,445 @@ class BankAccount(BaseModel):
         """
         password = hash_password(password)
         return cls(card_number, cvv2, password, balance, user_id)
+
+
+class Subscription(BaseModel):
+    name = "subscription"
+    id = Column("id", "INT UNSIGNED", primary_key=True, auto_increment=True)
+    s_name = Column("name", "VARCHAR(255)")
+    discount = Column("discount", "SMALLINT UNSIGNED")
+    duration = Column("duration", "SMALLINT UNSIGNED")
+    order_number = Column("order_number", "VARCHAR(255)", null=True)
+
+    def __init__(
+        self, name, discount, duration=30, order_number=0, id: Union[int, None] = None
+    ):
+        self.id = id
+        self.name = name
+        self.discount = discount
+        self.duration = duration
+        self.order_number = order_number
+
+    def set_new_subscription(self):
+        self.insert()
+
+    def update_subscription(self):
+        self.update(
+            {
+                Subscription.s_name: self.name,
+                Subscription.discount: self.discount,
+                Subscription.duration: self.duration,
+                Subscription.order_number: self.order_number,
+            }
+        )
+
+    def delete_subscription(self):
+        self.delete()
+
+
+class Movie(BaseModel):
+    name = "movie"
+    id = Column("id", "INT UNSIGNED", primary_key=True, auto_increment=True)
+    m_name = Column("name", "VARCHAR(255)")
+    duration = Column("duration", "TIME")
+    age_rating = Column("age_rating", "SMALLINT UNSIGNED")
+    screening_number = Column("screening_number", "SMALLINT UNSIGNED")
+
+    def __init__(
+        self,
+        name: str,
+        duration: int,
+        age_rating: int,
+        screening_number: int,
+        id: Union[int, None] = None,
+        rate=0,
+    ) -> None:
+        self.id = id
+        self.name = name
+        self.duration = duration
+        self.age_rating = age_rating
+        self.screening_number = screening_number
+        self.rate = rate
+
+    def add_movie(self):
+        self.insert()
+
+    def update_movie(self):
+        self.update(
+            {
+                Movie.m_name: self.name,
+                Movie.duration: self.duration,
+                Movie.age_rating: self.age_rating,
+                Movie.screening_number: self.screening_number,
+            }
+        )
+
+    def delete_movie(self):
+        self.delete()
+
+    @classmethod
+    def get_movies_list(cls) -> list["Movie"]:
+        query = f"SELECT {Movie.name}.*, {Movie.rate} from {Movie.name} m \
+                  LEFT JOIN (SELECT {MovieRate.movie_id.name}, \
+                  SUM({MovieRate.rate.name})/COUNT({MovieRate.rate.name}) as {Movie.rate} from {MovieRate.name} \
+                  GROUP BY {MovieRate.movie_id.name}) rt ON m.{Movie.id.name}=rt.{MovieRate.movie_id.name})"
+        results = cls.db_obj.fetch(query)
+        return [cls(**item) for item in results]
+
+
+class MovieRate(BaseModel):
+    name = "movie_rate"
+    id = Column("id", "INT UNSIGNED", primary_key=True, auto_increment=True)
+    user_id = Column(
+        "user_id", "INT UNSIGNED", foreign_key=User.id.name, reference=User.name
+    )
+    movie_id = Column(
+        "movie_id", "INT UNSIGNED", foreign_key=Movie.id.name, reference=Movie.name
+    )
+    rate = Column("rate", "INT UNSIGNED")
+
+    def __init__(
+        self,
+        user_id,
+        movie_id,
+        name: str,
+        rate: int,
+        id: Union[int, None] = None,
+    ) -> None:
+        self.id = id
+        self.name = name
+        self.rate = rate
+        self.user_id = user_id
+        self.movie_id = movie_id
+
+
+class Comment(BaseModel):
+    name = "comment"
+    id = Column("id", "INT UNSIGNED", primary_key=True, auto_increment=True)
+    user_id = Column(
+        "user_id", "INT UNSIGNED", foreign_key=User.id.name, reference=User.name
+    )
+    movie_id = Column(
+        "movie_id", "INT UNSIGNED", foreign_key=Movie.id.name, reference=Movie.name
+    )
+    parent_id = Column("parent_id", "INT UNSIGNED", foreign_key=id.name, reference=name)
+    text = Column("text", "TEXT")
+    created_at = Column("created_at", "DATE")
+
+    def __init__(
+        self,
+        user_id,
+        movie_id,
+        parent_id,
+        text,
+        created_at=datetime.now(),
+        id: Union[int, None] = None,
+    ):
+        self.id = id
+        self.user_id = user_id
+        self.movie_id = movie_id
+        self.parent_id = parent_id
+        self.text = text
+        self.created_at = created_at
+        self.replies = []
+
+    @staticmethod
+    def comment(user_id, movie_id, parent_id, text) -> None:
+        Comment(None, user_id, movie_id, parent_id, text).insert()
+
+    @staticmethod
+    def get_comments(movie_id) -> list["Comment"]:
+        result = []
+        comments = Comment.fetch_obj(f"{Comment.movie_id} = {movie_id}")
+        for i in range(len(comments)):
+            if comments[i].parent_id == 0:
+                result.append(comments[i])
+            for j in range(i + 1, len(comments)):
+                if comments[j].parent_id == comments[i].id:
+                    comments[i].replies.append(comments[j])
+        return result
+
+
+class UserSubscription(BaseModel):
+    name = "user_subscription"
+    id = Column("id", "INT UNSIGNED", primary_key=True, auto_increment=True)
+    user_id = Column(
+        "user_id", "INT UNSIGNED", foreign_key=User.id.name, reference=User.name
+    )
+    subscription_id = Column(
+        "subscription_id",
+        "INT UNSIGNED",
+        foreign_key=Subscription.id.name,
+        reference=Subscription.name,
+    )
+    buy_date = Column("buy_date", "DATETIME")
+    expire_date = Column("expire_date", "DATETIME")
+
+    @staticmethod
+    def set_user_subscription(user, subscription):
+        queries = []
+        duration = Subscription.fetch(
+            select=f"{Subscription.duration.name}",
+            where=f"{Subscription.id.name}={subscription.id}",
+        )
+        duration - duration[0][Subscription.duration.name]
+        price = Subscription.fetch(
+            select=f"{Subscription.price.name}",
+            where=f"{Subscription.id.name}={subscription.id}",
+        )
+        price = price[0][Subscription.price.name]
+        if user.subscription is not None:
+            queries.append(
+                f"UPDATE {UserSubscription.name} SET {UserSubscription.expire_date.name} = now() WHERE \
+                               {UserSubscription.id.name} = (SELECT {UserSubscription.id.name} from {UserSubscription.name} WHERE \
+                                    {UserSubscription.user_id.name} = {user.id} AND {UserSubscription.expire_date.name}>now())"
+            )
+
+        queries.append(
+            f"UPDATE {User.name} SET {User.balance.name}={User.balance.name} - {price} WHERE {User.id.name} = {user.id}"
+        )
+        queries.append(
+            f"INSERT INTO {UserSubscription.name} VALUES ({user.id}, {subscription.id}, NOW(), DATE_ADD(NOW(), INTERVAL {duration} DAY))"
+        )
+
+        try:
+            UserSubscription.db_obj.transaction(queries)
+        except dbError as err:
+            # print(f'Error while updating rows in "{self.name}".')
+            print(f"Error description: {err}")
+
+
+class Theater(BaseModel):
+    name = "theater"
+    id = Column("id", "INT UNSIGNED", primary_key=True, auto_increment=True)
+    tname = Column("name", "VARCHAR(255)")
+    capacity = Column("Capacity", "INT UNSIGNED")
+
+    def __init__(
+        self,
+        name: str,
+        capacity: int,
+        id: Union[int, None] = None,
+    ) -> None:
+        self.id = id
+        self.name = name
+        self.Capacity = capacity
+
+
+class Theater_Rate(BaseModel):
+    name = "theater_rate"
+    id = Column("id", "INT UNSIGNED", primary_key=True, auto_increment=True)
+    user_id = Column(
+        "user_id", "INT UNSIGNED", foreign_key=User.id.name, reference=User.name
+    )
+    theater_id = Column(
+        "theater_id",
+        "INT UNSIGNED",
+        foreign_key=Theater.id.name,
+        reference=Theater.name,
+    )
+    rate = Column("rate", "INT UNSIGNED")
+
+    def __init__(
+        self,
+        user_id,
+        theater_id,
+        name: str,
+        rate: int,
+        id: Union[int, None] = None,
+    ) -> None:
+        self.id = id
+        self.name = name
+        self.rate = rate
+        self.user_id = user_id
+        self.theater_id = theater_id
+
+
+class Show(BaseModel):
+    name = "show"
+    id = Column("id", "INT UNSIGNED", primary_key=True, auto_increment=True)
+    movie_id = Column(
+        "movie_id", "INT UNSIGNED", foreign_key=Movie.id.name, reference=Movie.name
+    )
+    theater_id = Column(
+        "theater_id",
+        "INT UNSIGNED",
+        foreign_key=Theater.id.name,
+        reference=Theater.name,
+    )
+    start_date = Column("start_date", "DATETIME")
+    end_date = Column("end_date", "DATETIME")
+    price = Column("price", "INT UNSIGNED")
+
+    def __init__(
+        self,
+        movie_id,
+        theater_id,
+        start_date,
+        end_date,
+        price,
+        id: Union[int, None] = None,
+        movie: Movie = None,
+        theater: Theater = None,
+    ):
+        self.id = id
+        self.movie_id = movie_id
+        self.theater_id = theater_id
+        self.start_date = start_date
+        self.end_date = end_date
+        self.price = price
+        self.movie = movie
+        self.theater = theater
+
+    def add_show(self):
+        self.insert()
+
+    def update_show(self):
+        self.update(
+            {
+                Show.movie_id: self.movie_id,
+                Show.theater_id: self.theater_id,
+                Show.start_date: self.start_date,
+                Show.end_date: self.end_date,
+                Show.price: self.price,
+            }
+        )
+
+    def delete_show(self):
+        self.delete()
+
+    def get_reserved_seat(self) -> list[int]:
+        """Returns reserved seat numbers of given show
+
+        Returns:
+            list: List of reserved seat number
+        """
+        results = Show.fetch(
+            select=Order.seat_number.name,
+            where=f"{Order.show_id.name} = {self.id} AND {Order.cancel_date.name} IS NULL",
+        )
+        return [d[Order.seat_number.name] for d in results]
+
+    def get_show_capacity(self) -> int:
+        """Returns the number of reserved seats"""
+        reserved_seats = "reserved_seats"
+        results = Show.fetch(
+            select=f"COUNT(*) as reserved_seats",
+            where=f"{Order.show_id.name} = {self.id} AND {Order.cancel_date.name} IS NULL",
+        )
+        return results[0][reserved_seats]
+
+    @classmethod
+    def get_shows_list(cls) -> list["Movie"]:
+        """Returns list of shows along with related movie (also it's rate) and theater objects.
+
+        Returns:
+            list: List of Movies
+        """
+        show_id, movie_id, theater_id, rate = "s_id", "m_id", "t_id", "rate"
+        sub_query = f"SELECT m.*, rate from {Movie.name} m \
+                        LEFT JOIN (SELECT {MovieRate.movie_id.name}, \
+                        SUM({MovieRate.rate.name})/COUNT({MovieRate.rate.name}) as {rate} from {MovieRate.name} \
+                        GROUP BY {MovieRate.movie_id.name}) rt ON m.{Movie.id.name}=rt.{MovieRate.movie_id.name})"
+        query = f"SELECT s.*, s.id as {show_id}, m.*, m.id as {movie_id}, th.*, th.id as {theater_id} \
+                    FROM {Show.name} s \
+                    JOIN {sub_query} m ON s.{Show.movie_id.name} = m.{Movie.id.name} \
+                    JOIN {Theater.name} th ON s.{Show.theater_id.name} = th.{Theater.id.name} \
+                    WHERE s.{Show.start_date.name} > now()"
+        results = cls.db_obj.execute(query)
+        list = []
+        for item in results:
+            show_obj = cls(
+                item[Show.movie_id.name],
+                item[Show.theater_id.name],
+                item[Show.start_date.name],
+                item[Show.end_date.name],
+                item[Show.price.name],
+                item[show_id],
+            )
+            show_obj.movie = Movie(
+                item[Movie.m_name.name],
+                item[Movie.duration.name],
+                item[Movie.age_rating.name],
+                item[Movie.screening_number.name],
+                item[movie_id],
+            )
+            show_obj.theater = Theater(
+                item[Theater.tname.name], item[Theater.capacity.name], item[theater_id]
+            )
+            list.append(show_obj)
+        return list
+
+
+class Order(BaseModel):
+    name = "order"
+    id = Column("id", "INT UNSIGNED", primary_key=True, auto_increment=True)
+    user_id = Column(
+        "user_id", "INT UNSIGNED", foreign_key=User.id.name, reference=User.name
+    )
+    show_id = Column(
+        "show_id",
+        "INT UNSIGNED",
+        foreign_key=Show.id.name,
+        reference=Show.name,
+    )
+    seat_number = Column("seat_number", "SMALLINT UNSIGNED")
+    discount = Column("discount", "SMALLINT UNSIGNED")
+    create_date = Column("create_date", "DATETIME")
+    cancel_date = Column("cancel_date", "DATETIME", null=True)
+
+    def __init__(
+        self,
+        user_id,
+        show_id,
+        seat_number,
+        discount,
+        create_date=datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+        cancel_date: Union[str, None] = None,
+        id: Union[int, None] = None,
+    ):
+        self.id = id
+        self.user_id = user_id
+        self.show_id = show_id
+        self.seat_number = seat_number
+        self.discount = discount
+        self.create_date = create_date
+        self.cancel_date = cancel_date
+
+    def reserve(self):
+        self.insert()
+
+    def cancel_order(self, user: User, fine: int) -> None:
+        """updates 'user' table set 'balance' ->  increase the balance equal to ticket price minus the fine
+        and 'order' table set 'cancel_date' -> now.
+
+        Args:
+            user (User): logged in user
+            fine (int): based on the time remaining until the start of the show
+
+        Returns:
+            None
+        """
+        show_price = Show.fetch(
+            select=f"{Show.price}", where=f"{Show.id} = {self.show_id}"
+        )[0][Show.price.name]
+        current_date = datetime.now()
+        formatted_date = current_date.strftime("%Y-%m-%d %H:%M:%S")
+        query1 = user.update_query(
+            {User.balance: user.balance + show_price * ((100 - fine) / 100)}
+        )
+        query2 = self.update_query({Order.cancel_date: formatted_date})
+        try:
+            self.db_obj.transaction([query1, query2])
+        except dbError as err:
+            print(f'Error while updating rows in "{self.name}" or "{user.name}.')
+            print(f"Error description: {err}")
+
+    @classmethod
+    def get_user_orders(cls, user):
+        results = Order.fetch_obj(
+            where=f"{Order.user_id.name} = {user.id}",
+            order_by={Order.create_date.name},
+            descending=True,
+        )
+        return results

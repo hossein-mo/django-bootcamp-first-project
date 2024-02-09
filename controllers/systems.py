@@ -34,8 +34,7 @@ class UserManagement:
         return user
 
     @staticmethod
-    def sign_up(data: dict, role: UserRole):
-        data["role"] = role
+    def sign_up(data: dict):
         signup_handler = uHandlers.UsernameVerification()
         email = uHandlers.EmailVerification()
         phome_number = uHandlers.PhoneVerification()
@@ -50,20 +49,21 @@ class UserManagement:
         return user
 
     @staticmethod
-    def authenticate(request: dict, role: UserRole = UserRole.USER):
+    def authenticate(request: dict):
         data = request["data"]
-        print(request)
         if request["type"] == "login":
             user = UserManagement.login(data)
         elif request["type"] == "signup":
-            user = UserManagement.sign_up(data, role)
+            user = UserManagement.sign_up(data)
         else:
             raise cExcept.AuthenticationFaild
         return user
 
     @staticmethod
-    def client_authenticatation(request):
+    def client_authenticatation(request, role: UserRole = UserRole.USER):
         user = None
+        if request["type"] == "signup":
+            request["data"]["role"] = role
         try:
             user = UserManagement.authenticate(request)
             user_info = UserManagement.get_safe_user_info(user)
@@ -93,7 +93,7 @@ class UserManagement:
 
     @staticmethod
     def edit_profile(data: dict, user: User):
-        data['user'] = user
+        data["user"] = user
         handler = uHandlers.UsernameVerification()
         email = uHandlers.EmailVerification()
         phone_number = uHandlers.PhoneVerification()
@@ -133,8 +133,9 @@ class UserManagement:
             return response, user
 
     @staticmethod
-    def create_admin(userdata: dict):
-        return UserManagement.sign_up(userdata, role=UserRole.ADMIN)
+    def create_admin(userdata: dict) -> tuple:
+        request = {"type": "signup", "data": userdata}
+        return UserManagement.client_authenticatation(request, role=UserRole.ADMIN)
 
     @staticmethod
     @authorize(authorized_roles={UserRole.ADMIN})
@@ -167,4 +168,4 @@ class UserManagement:
 #         account = BankAccount.fetch_obj(
 #             where=f'{BankAccount.id} = "{account_id}" AND {BankAccount.user_id} = "{user.id}"'
 #         )
-        # if account
+# if account

@@ -37,11 +37,14 @@ class EmailVerification(AbstractHandler):
 
 class PhoneVerification(AbstractHandler):
     def handle(self, data: dict) -> dict | None:
-        phone_pattern = re.compile(r"^(09[0-3][0-9]-?[0-9]{3}-?[0-9]{4})$")
-        if not bool(phone_pattern.match(data["phone_number"])) and not None:
-            raise InvalidUserInfo(
-                message="Please enter a phone number with the correct format!"
-            )
+        if 'phone_number' not in data:
+            data['phone_number'] = None
+        else:
+            phone_pattern = re.compile(r"^(09[0-3][0-9]-?[0-9]{3}-?[0-9]{4})$")
+            if not bool(phone_pattern.match(data["phone_number"])):
+                raise InvalidUserInfo(
+                    message="Please enter a phone number with the correct format!"
+                )
         return super().handle(data)
 
 

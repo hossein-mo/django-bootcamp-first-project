@@ -10,9 +10,9 @@ from models.meta import SingletonMeta
 
 class DatabaseConnection(metaclass=SingletonMeta):
     HOST = "localhost"
-    PORT = "3306"
+    PORT = "3307"
     USER = "root"
-    PASSWORD = "pass"
+    PASSWORD = "123456"
     DB_NAME = "pytonilia_db"
     POOL_SIZE = 5
 
@@ -31,12 +31,26 @@ class DatabaseConnection(metaclass=SingletonMeta):
             connection.commit()
             cursor.close()
 
-    def __init__(self, db_name: str = DB_NAME) -> None:
+    def __init__(
+        self,
+        host: str = HOST,
+        port: str = PORT,
+        user: str = USER,
+        password: str = PASSWORD,
+        db_name: str = DB_NAME,
+        pool_size: int = POOL_SIZE,
+    ) -> None:
         """Constructor for DatabaseConnection class
 
         Args:
             db_name (str, optional): database name. Defaults to DB_NAME.
         """
+        self.HOST = host
+        self.PORT = port
+        self.USER = user
+        self.PASSWORD = password
+        self.DB_NAME = db_name
+        self.POOL_SIZE = pool_size
         self.__dbconfig = {
             "host": self.HOST,
             "port": self.PORT,

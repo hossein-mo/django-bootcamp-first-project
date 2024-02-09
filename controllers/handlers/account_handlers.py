@@ -3,14 +3,26 @@ import sys
 import re
 from datetime import date
 from typing import Any, Dict, Optional, List
-
+from random import randint
 sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(__file__))))
 from controllers.handlers.abstract_handler import AbstractHandler
 from controllers.exceptions import NotEnoughBalance, InvalidRequest, WrongBankAccCreds
 from models.models import User, BankAccount
 from utils.utils import hash_password
 
-
+class AddAccount(AbstractHandler):
+    def handle(self, data: dict) -> dict:
+        user = data['user']
+        card_info = data['card_info']
+        card_info['balance'] = randint(1000000,3000000)
+        card_info['user_id'] = user.id
+        b_account = BankAccount.create_new(**card_info)
+        b_account.insert()
+        data['card_info'] = b_account.info()
+        if self._next_handler:
+            return super().handle(data)
+        else:
+            return data
 class UserAccounts(AbstractHandler):
     def handle(self, data: dict) -> dict:
         user = data["user"]

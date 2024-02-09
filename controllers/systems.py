@@ -4,6 +4,7 @@ from typing import List
 
 sys.path.append(os.path.dirname(os.path.dirname(__file__)))
 import controllers.handlers.user_handlers as uHandlers
+import controllers.handlers.account_handlers as baHandlers
 import controllers.exceptions as cExcept
 import models.model_exceptions as mExcept
 from models.models import User, BankAccount
@@ -140,19 +141,25 @@ class UserManagement:
         return response
 
 
-# class BankAccountManagement:
-#     @staticmethod
-#     def get_safe_acc_info(acc: BankAccount) -> dict:
-#         return {"id": acc.id, "card_number": acc.card_number, "balance": acc.balance}
+class AccountManagement:
+    @staticmethod
+    def add_account_user(user: User, data: dict) -> dict:
+        data = {'user': user, 'card_info': data}
+        account = baHandlers.AddAccount()
+        try:
+            data = account.handle(data)
+            return create_response(True, 'account', "Bank account has been added to your profile.", data['card_info'])
+        except KeyError as err:
+            return create_response(False, 'account', "Invalid card info.")
+            
 
-#     @staticmethod
-#     def get_user_accounts(user) -> List[BankAccount]:
-#         user_accs = BankAccount.fetch_obj(where=f"{BankAccount.user_id} = {user.id}")
-#         return user_accs
+    # @staticmethod
+    # def get_user_accounts(user) -> List[BankAccount]:
+    #     user_accs = BankAccount.fetch_obj(where=f"{BankAccount.user_id} = {user.id}")
+    #     return user_accs
 
-#     @staticmethod
-#     def wallet_deposit(user: User, account_id: int) -> None:
-#         account = BankAccount.fetch_obj(
-#             where=f'{BankAccount.id} = "{account_id}" AND {BankAccount.user_id} = "{user.id}"'
-#         )
-# if account
+    # @staticmethod
+    # def wallet_deposit(user: User, account_id: int) -> None:
+    #     account = BankAccount.fetch_obj(
+    #         where=f'{BankAccount.id} = "{account_id}" AND {BankAccount.user_id} = "{user.id}"'
+    #     )

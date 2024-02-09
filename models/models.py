@@ -198,6 +198,13 @@ class BankAccount(BaseModel):
         self.balance = balance
         self.user_id = user_id
 
+    def info(self) -> dict:
+        return {
+            "id": self.id,
+            "card_number": self.card_number,
+            "balance": self.balance,
+        }
+
     def update(self):
         self.update(
             {
@@ -208,7 +215,7 @@ class BankAccount(BaseModel):
         )
 
     @staticmethod
-    def deposit(account: Union[User, 'BankAccount'], amount: int) -> None:
+    def deposit(account: Union[User, "BankAccount"], amount: int) -> None:
         """Add amount to user's balance and update database.
 
         Args:
@@ -220,14 +227,18 @@ class BankAccount(BaseModel):
         return True
 
     @staticmethod
-    def withdraw(account: Union[User, 'BankAccount'], amount: int) -> None:
+    def withdraw(account: Union[User, "BankAccount"], amount: int) -> None:
         acc_cls = account.__class__
         account.update({acc_cls.balance: account.balance - amount})
         account.balance -= amount
         return True
 
     @staticmethod
-    def transfer(origin: Union[User, 'BankAccount'], dest: Union[User, 'BankAccount'], amount: int) -> bool:
+    def transfer(
+        origin: Union[User, "BankAccount"],
+        dest: Union[User, "BankAccount"],
+        amount: int,
+    ) -> bool:
         """Transfer amount from instance balance to destination instance balance.
 
         Args:

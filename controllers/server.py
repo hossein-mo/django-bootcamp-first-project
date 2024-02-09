@@ -8,7 +8,7 @@ from typing import Tuple
 sys.path.append(os.path.dirname(os.path.dirname(__file__)))
 
 from utils.utils import create_response
-from controllers.systems import UserManagement
+from controllers.systems import UserManagement, AccountManagement
 
 
 class TCPServer:
@@ -69,6 +69,9 @@ class TCPServer:
                         )
                     if request["subtype"] == "changerole":
                         response = UserManagement.change_user_role(user, request["data"])
+                elif request['type'] == 'account':
+                    if request['subtype'] == 'add':
+                        response = AccountManagement.add_account_user(user, request["data"])
                 TCPServer.socket_send(client_socket, response, size_length)
 
         client_socket.close()

@@ -7,7 +7,7 @@ from typing import Any, Dict, Optional
 sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(__file__))))
 from controllers.handlers.abstract_handler import AbstractHandler
 from controllers.exceptions import PasswordPolicyNotPassed, InvalidUserInfo
-from models.models import User
+from models.models import User, UserRole
 from models.model_exceptions import DuplicatedEntry, WrongCredentials
 from utils.utils import hash_password
 
@@ -151,19 +151,22 @@ class LoginHandler(AbstractHandler):
 
 class ChangeUserRole(AbstractHandler):
     def handle(self, data: dict) -> dict | None:
-        if "username" in data:
-            username = data["username"]
-            affected_user = User.fetch_obj(where=f'{User.username}="{username}"')
-        elif "email" in data:
-            email = data["email"]
-            affected_user = User.fetch_obj(where=f'{User.email}="{email}"')
-        if affected_user:
-            affected_user = affected_user[0]
-            affected_user.role = data['new_role']
-            affected_user.update({User.role, affected_user.role})
+        if data['new_role'] in UserRole:
+            if "username" in data:
+                username = data["username"]
+                affected_user = User.fetch_obj(where=f'{User.username}="{username}"')
+            elif "email" in data:
+                email = data["email"]
+                affected_user = User.fetch_obj(where=f'{User.email}="{email}"')
+            if affected_user:
+                affected_user = affected_user[0]
+                affected_user.role = UserRole(data['new_role'])
+                affected_user.update({User.role: affected_user.role})
+            else:
+                raise InvalidUserInfo('User not found')
+            if self._next_handler:
+                return super().handle(data)
+            else:
+                return data
         else:
-            raise InvalidUserInfo('User not found')
-        if self._next_handler:
-            return super().handle(data)
-        else:
-            return data
+            raise InvalidUserInfo("Requested role doesn't exist.")

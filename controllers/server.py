@@ -61,12 +61,14 @@ class TCPServer:
                 if request["type"] == "profile":
                     if request["subtype"] == "update":
                         response, user = UserManagement.edit_profile(
-                            request["data"], user
+                            user, request["data"]
                         )
                     if request["subtype"] == "changepass":
-                        response, user = UserManagement.change_password(
-                            request["data"], user
+                        response = UserManagement.change_password(
+                            user, request["data"]
                         )
+                    if request["subtype"] == "changerole":
+                        response = UserManagement.change_user_role(user, request["data"])
                 TCPServer.socket_send(client_socket, response, size_length)
 
         client_socket.close()

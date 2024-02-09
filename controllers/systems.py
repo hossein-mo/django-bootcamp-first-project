@@ -92,7 +92,7 @@ class UserManagement:
             return response, user
 
     @staticmethod
-    def edit_profile(data: dict, user: User):
+    def edit_profile(user: User, data: dict):
         data["user"] = user
         handler = uHandlers.UsernameVerification()
         email = uHandlers.EmailVerification()
@@ -115,7 +115,7 @@ class UserManagement:
             return response, user
 
     @staticmethod
-    def change_password(data: dict, user: User):
+    def change_password(user: User, data: dict):
         handler = uHandlers.PasswordPolicyVerification()
         change_password = uHandlers.ChangePassword()
         handler.set_next(change_password)
@@ -132,7 +132,7 @@ class UserManagement:
         except mExcept.WrongCredentials as err:
             response = create_response(False, "user", err.message)
         finally:
-            return response, user
+            return response
 
     @staticmethod
     def create_admin(userdata: dict) -> tuple:
@@ -142,7 +142,7 @@ class UserManagement:
     @staticmethod
     @authorize(authorized_roles={UserRole.ADMIN})
     def change_user_role(user: User, data: dict):
-        change_role = uHandlers.UserRoleChange()
+        change_role = uHandlers.ChangeUserRole()
         try:
             change_role.handle(data)
             res_message = f"User role succesfully changed!"

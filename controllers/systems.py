@@ -157,10 +157,10 @@ class AccountManagement:
             return create_response(False, 'account', err.message)
             
 
-    # @staticmethod
-    # def get_user_accounts(user) -> List[BankAccount]:
-    #     user_accs = BankAccount.fetch_obj(where=f"{BankAccount.user_id} = {user.id}")
-    #     return user_accs
+    @staticmethod
+    def get_user_accounts(user) -> List[BankAccount]:
+        user_accs = BankAccount.fetch_obj(where=f"{BankAccount.user_id} = {user.id}")
+        return create_response(True, 'account', "", data={'accounts': [acc.info() for acc in user_accs]})
 
     # @staticmethod
     # def wallet_deposit(user: User, account_id: int) -> None:

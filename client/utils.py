@@ -1,4 +1,4 @@
-def create_request(type: str, data: dict, subtype: str = '') -> dict:
+def create_request(type: str, subtype: str = '', data: dict = {}) -> dict:
     if subtype:
         return {"type": type, 'subtype': subtype, "data": data}
     else:

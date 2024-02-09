@@ -63,15 +63,17 @@ class TCPServer:
                         response, user = UserManagement.edit_profile(
                             user, request["data"]
                         )
-                    if request["subtype"] == "changepass":
+                    elif request["subtype"] == "changepass":
                         response = UserManagement.change_password(
                             user, request["data"]
                         )
-                    if request["subtype"] == "changerole":
+                    elif request["subtype"] == "changerole":
                         response = UserManagement.change_user_role(user, request["data"])
                 elif request['type'] == 'account':
                     if request['subtype'] == 'add':
                         response = AccountManagement.add_account_user(user, request["data"])
+                    elif request['subtype'] == 'list':
+                        response = AccountManagement.get_user_accounts(user)
                 TCPServer.socket_send(client_socket, response, size_length)
 
         client_socket.close()

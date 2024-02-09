@@ -16,7 +16,9 @@ class TCPServer:
     PORT: int
     SIZE_BYTES_LENGTH: int
 
-    def __init__(self, host: str, port: int, size_length: int = 4) -> None:
+    def __init__(
+        self, host: str = "localhost", port: int = 8000, size_length: int = 4
+    ) -> None:
         self.HOST = host
         self.PORT = port
         self.SIZE_BYTES_LENGTH = size_length
@@ -80,8 +82,3 @@ class TCPServer:
                 target=TCPServer.client_handler, args=(client, self.SIZE_BYTES_LENGTH)
             )
             client_handler.start()
-
-
-if __name__ == "__main__":
-    server = TCPServer("localhost", 8000)
-    server.start_server()

@@ -4,6 +4,7 @@ from typing import List
 
 sys.path.append(os.path.dirname(os.path.dirname(__file__)))
 import controllers.handlers.user_handlers as uHandlers
+import controllers.handlers.account_handlers as baHandlers
 import controllers.exceptions as cExcept
 import models.model_exceptions as mExcept
 from models.models import User, BankAccount
@@ -13,18 +14,6 @@ from utils.utils import create_response
 
 
 class UserManagement:
-    @staticmethod
-    def get_safe_user_info(user: User) -> dict:
-        return {
-            "username": user.username,
-            "email": user.email,
-            "phone_number": user.phone_number,
-            "birth_date": user.birth_date,
-            "last_login": user.last_login,
-            "register_date": user.register_date,
-            "balance": user.balance,
-            "role": user.role.value,
-        }
 
     @staticmethod
     def login(data: dict):
@@ -49,7 +38,7 @@ class UserManagement:
         return user
 
     @staticmethod
-    def authenticate(request: dict):
+    def authenticate(request: dict) -> User | None:
         data = request["data"]
         if request["type"] == "login":
             user = UserManagement.login(data)
@@ -66,9 +55,8 @@ class UserManagement:
             request["data"]["role"] = role
         try:
             user = UserManagement.authenticate(request)
-            user_info = UserManagement.get_safe_user_info(user)
             response = create_response(
-                True, "user", "Authentication succesfull.", user_info
+                True, "user", "Authentication succesfull.", user.info()
             )
         except mExcept.WrongCredentials:
             print("Invalid Credentials")
@@ -92,7 +80,7 @@ class UserManagement:
             return response, user
 
     @staticmethod
-    def edit_profile(data: dict, user: User):
+    def edit_profile(user: User, data: dict):
         data["user"] = user
         handler = uHandlers.UsernameVerification()
         email = uHandlers.EmailVerification()
@@ -101,9 +89,8 @@ class UserManagement:
         handler.set_next(email).set_next(phone_number).set_next(profile_update)
         try:
             handler.handle(data)
-            user_info = UserManagement.get_safe_user_info(user)
             response = create_response(
-                True, "user", "Authentication succesfull.", user_info
+                True, "user", "Authentication succesfull.", user.info()
             )
         except cExcept.InvalidUserInfo as err:
             print(err)
@@ -115,16 +102,15 @@ class UserManagement:
             return response, user
 
     @staticmethod
-    def change_password(data: dict, user: User):
+    def change_password(user: User, data: dict):
         handler = uHandlers.PasswordPolicyVerification()
         change_password = uHandlers.ChangePassword()
         handler.set_next(change_password)
         data["user"] = user
         try:
             handler.handle(data)
-            user_info = UserManagement.get_safe_user_info(user)
             response = create_response(
-                True, "user", "Password succecfully changed!", user_info
+                True, "user", "Password succecfully changed!", user.info()
             )
         except cExcept.PasswordPolicyNotPassed as err:
             print(err)
@@ -132,7 +118,7 @@ class UserManagement:
         except mExcept.WrongCredentials as err:
             response = create_response(False, "user", err.message)
         finally:
-            return response, user
+            return response
 
     @staticmethod
     def create_admin(userdata: dict) -> tuple:
@@ -142,7 +128,7 @@ class UserManagement:
     @staticmethod
     @authorize(authorized_roles={UserRole.ADMIN})
     def change_user_role(user: User, data: dict):
-        change_role = uHandlers.UserRoleChange()
+        change_role = uHandlers.ChangeUserRole()
         try:
             change_role.handle(data)
             res_message = f"User role succesfully changed!"
@@ -155,19 +141,29 @@ class UserManagement:
         return response
 
 
-# class BankAccountManagement:
-#     @staticmethod
-#     def get_safe_acc_info(acc: BankAccount) -> dict:
-#         return {"id": acc.id, "card_number": acc.card_number, "balance": acc.balance}
+class AccountManagement:
+    @staticmethod
+    def add_account_user(user: User, data: dict) -> dict:
+        data = {'user': user, 'card_info': data}
+        account = baHandlers.AddAccount()
+        try:
+            data = account.handle(data)
+            return create_response(True, 'account', "Bank account has been added to your profile.", data['card_info'])
+        except KeyError as err:
+            return create_response(False, 'account', "Invalid card info.")
+        except TypeError as err:
+            return create_response(False, 'account', "Invalid card info.")
+        except cExcept.InvalidRequest as err:
+            return create_response(False, 'account', err.message)
+            
 
-#     @staticmethod
-#     def get_user_accounts(user) -> List[BankAccount]:
-#         user_accs = BankAccount.fetch_obj(where=f"{BankAccount.user_id} = {user.id}")
-#         return user_accs
+    @staticmethod
+    def get_user_accounts(user) -> List[BankAccount]:
+        user_accs = BankAccount.fetch_obj(where=f"{BankAccount.user_id} = {user.id}")
+        return create_response(True, 'account', "", data={'accounts': [acc.info() for acc in user_accs]})
 
-#     @staticmethod
-#     def wallet_deposit(user: User, account_id: int) -> None:
-#         account = BankAccount.fetch_obj(
-#             where=f'{BankAccount.id} = "{account_id}" AND {BankAccount.user_id} = "{user.id}"'
-#         )
-# if account
+    # @staticmethod
+    # def wallet_deposit(user: User, account_id: int) -> None:
+    #     account = BankAccount.fetch_obj(
+    #         where=f'{BankAccount.id} = "{account_id}" AND {BankAccount.user_id} = "{user.id}"'
+    #     )

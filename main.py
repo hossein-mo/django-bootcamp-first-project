@@ -7,7 +7,7 @@ sys.path.append(Path(__file__).parent)
 from controllers.server import TCPServer
 from models.base_models import Backend
 
-def confif_loader(config_path: str) -> dict:
+def config_loader(config_path: str) -> dict:
     config = ConfigParser()
     config.read(config_path)
     conf_dict = {}
@@ -23,8 +23,7 @@ def confif_loader(config_path: str) -> dict:
 if __name__ == "__main__":
     root_path = Path(__file__).parent
     config_path = root_path.joinpath('config.ini')
-    config = confif_loader(config_path)
-    print(config)
+    config = config_loader(config_path)
     Backend.run_db_connection(config['database'])
     server = TCPServer(**config['server'])
     server.start_server()

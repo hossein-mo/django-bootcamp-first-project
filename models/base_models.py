@@ -1,6 +1,6 @@
 import os
 import sys
-from enum import Enum
+from enum import Enum, EnumMeta
 from typing import Union, Any, List, Dict
 from mysql.connector import Error as dbError
 from mysql.connector import IntegrityError
@@ -363,7 +363,20 @@ class BaseModel:
             return rowcount
 
 
-class UserRole(Enum):
+class MetaEnum(EnumMeta):
+    def __contains__(cls, item):
+        try:
+            cls(item)
+        except ValueError:
+            return False
+        return True
+
+
+class BaseEnum(Enum, metaclass=MetaEnum):
+    pass
+
+
+class UserRole(BaseEnum, metaclass=MetaEnum):
     ADMIN = "admin"
     STAFF = "staff"
     USER = "user"
@@ -376,6 +389,9 @@ class UserRole(Enum):
             str: comma seperated string
         """
         return ", ".join([f"'{role.value}'" for role in cls])
+
+    def __str__(self) -> str:
+        return str(self.value)
 
 
 class Backend:

@@ -68,6 +68,18 @@ class User(BaseModel):
         self.phone_number = phone_number
         self.balance = balance
 
+    def info(self) -> dict:
+        return {
+            "username": self.username,
+            "email": self.email,
+            "phone_number": self.phone_number,
+            "birth_date": self.birth_date,
+            "last_login": self.last_login,
+            "register_date": self.register_date,
+            "balance": self.balance,
+            "role": self.role.value,
+        }
+
     def update_last_login(self) -> None:
         """Updated the last login time of the user in database to now"""
         self.last_login = datetime.now()
@@ -186,6 +198,13 @@ class BankAccount(BaseModel):
         self.balance = balance
         self.user_id = user_id
 
+    def info(self) -> dict:
+        return {
+            "id": self.id,
+            "card_number": self.card_number,
+            "balance": self.balance,
+        }
+
     def update(self):
         self.update(
             {
@@ -196,7 +215,7 @@ class BankAccount(BaseModel):
         )
 
     @staticmethod
-    def deposit(account: Union[User, 'BankAccount'], amount: int) -> None:
+    def deposit(account: Union[User, "BankAccount"], amount: int) -> None:
         """Add amount to user's balance and update database.
 
         Args:
@@ -208,14 +227,18 @@ class BankAccount(BaseModel):
         return True
 
     @staticmethod
-    def withdraw(account: Union[User, 'BankAccount'], amount: int) -> None:
+    def withdraw(account: Union[User, "BankAccount"], amount: int) -> None:
         acc_cls = account.__class__
         account.update({acc_cls.balance: account.balance - amount})
         account.balance -= amount
         return True
 
     @staticmethod
-    def transfer(origin: Union[User, 'BankAccount'], dest: Union[User, 'BankAccount'], amount: int) -> bool:
+    def transfer(
+        origin: Union[User, "BankAccount"],
+        dest: Union[User, "BankAccount"],
+        amount: int,
+    ) -> bool:
         """Transfer amount from instance balance to destination instance balance.
 
         Args:

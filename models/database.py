@@ -51,7 +51,6 @@ class DatabaseConnection(metaclass=SingletonMeta):
             "user": self.user,
             "password": self.password,
         }
-        print(self.__dbconfig)
         try:
             self.create_db_if_not_exist(self.__dbconfig)
         except mysql.connector.Error as err:

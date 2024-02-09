@@ -124,11 +124,13 @@ class UserManagement:
             handler.handle(data)
             user_info = UserManagement.get_safe_user_info(user)
             response = create_response(
-                True, "user", "Authentication succesfull.", user_info
+                True, "user", "Password succecfully changed!", user_info
             )
         except cExcept.PasswordPolicyNotPassed as err:
             print(err)
-            response = create_response(False, "user", "Invalid password!")
+            response = create_response(False, "user", err.message)
+        except mExcept.WrongCredentials as err:
+            response = create_response(False, "user", err.message)
         finally:
             return response, user
 

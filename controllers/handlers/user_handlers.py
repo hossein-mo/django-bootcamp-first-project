@@ -104,6 +104,8 @@ class ChangePassword(AbstractHandler):
         user = data["user"]
         if hash_password(old_password) == user.password:
             user.update({User.password: hash_password(password)})
+        else:
+            raise WrongCredentials('Wrong password!')
         if self._next_handler:
             return super().handle(data)
         else:

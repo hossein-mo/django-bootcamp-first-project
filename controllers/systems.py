@@ -13,18 +13,6 @@ from utils.utils import create_response
 
 
 class UserManagement:
-    @staticmethod
-    def get_safe_user_info(user: User) -> dict:
-        return {
-            "username": user.username,
-            "email": user.email,
-            "phone_number": user.phone_number,
-            "birth_date": user.birth_date,
-            "last_login": user.last_login,
-            "register_date": user.register_date,
-            "balance": user.balance,
-            "role": user.role.value,
-        }
 
     @staticmethod
     def login(data: dict):
@@ -49,7 +37,7 @@ class UserManagement:
         return user
 
     @staticmethod
-    def authenticate(request: dict):
+    def authenticate(request: dict) -> User | None:
         data = request["data"]
         if request["type"] == "login":
             user = UserManagement.login(data)
@@ -66,9 +54,8 @@ class UserManagement:
             request["data"]["role"] = role
         try:
             user = UserManagement.authenticate(request)
-            user_info = UserManagement.get_safe_user_info(user)
             response = create_response(
-                True, "user", "Authentication succesfull.", user_info
+                True, "user", "Authentication succesfull.", user.info()
             )
         except mExcept.WrongCredentials:
             print("Invalid Credentials")
@@ -101,9 +88,8 @@ class UserManagement:
         handler.set_next(email).set_next(phone_number).set_next(profile_update)
         try:
             handler.handle(data)
-            user_info = UserManagement.get_safe_user_info(user)
             response = create_response(
-                True, "user", "Authentication succesfull.", user_info
+                True, "user", "Authentication succesfull.", user.info()
             )
         except cExcept.InvalidUserInfo as err:
             print(err)
@@ -122,9 +108,8 @@ class UserManagement:
         data["user"] = user
         try:
             handler.handle(data)
-            user_info = UserManagement.get_safe_user_info(user)
             response = create_response(
-                True, "user", "Password succecfully changed!", user_info
+                True, "user", "Password succecfully changed!", user.info()
             )
         except cExcept.PasswordPolicyNotPassed as err:
             print(err)

@@ -68,6 +68,18 @@ class User(BaseModel):
         self.phone_number = phone_number
         self.balance = balance
 
+    def info(self) -> dict:
+        return {
+            "username": self.username,
+            "email": self.email,
+            "phone_number": self.phone_number,
+            "birth_date": self.birth_date,
+            "last_login": self.last_login,
+            "register_date": self.register_date,
+            "balance": self.balance,
+            "role": self.role.value,
+        }
+
     def update_last_login(self) -> None:
         """Updated the last login time of the user in database to now"""
         self.last_login = datetime.now()

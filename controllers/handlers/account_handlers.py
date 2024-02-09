@@ -15,6 +15,8 @@ class AddAccount(AbstractHandler):
         user = data['user']
         card_info = data['card_info']
         card_number = card_info['card_number']
+        if len(card_number) != 16:
+            raise InvalidRequest("Card number should be 16 digits.")
         duplicated_acc = BankAccount.fetch_obj(where=f'{BankAccount.card_number} = "{card_number}" AND {BankAccount.user_id} = "{user.id}"')
         if not duplicated_acc:
             card_info['balance'] = randint(1000000,3000000)

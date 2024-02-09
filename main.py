@@ -5,13 +5,9 @@ from configparser import ConfigParser
 
 sys.path.append(Path(__file__).parent)
 from controllers.server import TCPServer
-from models.database import DatabaseConnection
+from models.base_models import Backend
 
-
-
-if __name__ == "__main__":
-    root_path = Path(__file__).parent
-    config_path = root_path.joinpath('config.ini')
+def confif_loader(config_path: str) -> dict:
     config = ConfigParser()
     config.read(config_path)
     conf_dict = {}
@@ -22,6 +18,13 @@ if __name__ == "__main__":
                 conf_dict[section][option] = config.getint(section, option)
             else:
                 conf_dict[section][option] = config.get(section, option)
-    db = DatabaseConnection(**conf_dict['database'])
-    server = TCPServer(**conf_dict['server'])
+    return conf_dict
+
+if __name__ == "__main__":
+    root_path = Path(__file__).parent
+    config_path = root_path.joinpath('config.ini')
+    config = confif_loader(config_path)
+    print(config)
+    Backend.run_db_connection(config['database'])
+    server = TCPServer(**config['server'])
     server.start_server()

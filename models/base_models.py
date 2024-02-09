@@ -88,7 +88,7 @@ class Column:
 
 class BaseModel:
     name: str
-    db_obj = DatabaseConnection()
+    db_obj: DatabaseConnection
 
     @classmethod
     def create_new(cls, **kwargs):
@@ -376,3 +376,9 @@ class UserRole(Enum):
             str: comma seperated string
         """
         return ", ".join([f"'{role.value}'" for role in cls])
+
+
+class Backend:
+    @staticmethod
+    def run_db_connection(dbconf: dict) -> None:
+        BaseModel.db_obj = DatabaseConnection(**dbconf)

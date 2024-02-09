@@ -43,7 +43,8 @@ class NotEnoughBalance(Exception):
 
 class InvalidRequest(Exception):
     def __init__(self, message: str = "Invalid request please try again!") -> None:
-        super().__init__(message)
+        self.message = message
+        super().__init__(self.message)
 
 class WrongBankAccCreds(Exception):
     def __init__(self, message: str = "Wrong bank account credentials, please try again!") -> None:

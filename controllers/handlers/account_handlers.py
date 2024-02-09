@@ -14,11 +14,16 @@ class AddAccount(AbstractHandler):
     def handle(self, data: dict) -> dict:
         user = data['user']
         card_info = data['card_info']
-        card_info['balance'] = randint(1000000,3000000)
-        card_info['user_id'] = user.id
-        b_account = BankAccount.create_new(**card_info)
-        b_account.insert()
-        data['card_info'] = b_account.info()
+        card_number = card_info['card_number']
+        duplicated_acc = BankAccount.fetch_obj(where=f'{BankAccount.card_number} = "{card_number}" AND {BankAccount.user_id} = "{user.id}"')
+        if not duplicated_acc:
+            card_info['balance'] = randint(1000000,3000000)
+            card_info['user_id'] = user.id
+            b_account = BankAccount.create_new(**card_info)
+            b_account.insert()
+            data['card_info'] = b_account.info()
+        else:
+            raise InvalidRequest("Duplicated card number, please add another card.")
         if self._next_handler:
             return super().handle(data)
         else:

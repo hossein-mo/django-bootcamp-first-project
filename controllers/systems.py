@@ -153,6 +153,8 @@ class AccountManagement:
             return create_response(False, 'account', "Invalid card info.")
         except TypeError as err:
             return create_response(False, 'account', "Invalid card info.")
+        except cExcept.InvalidRequest as err:
+            return create_response(False, 'account', err.message)
             
 
     # @staticmethod

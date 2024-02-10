@@ -1,6 +1,7 @@
 from models.meta import SingletonMeta
 from datetime import datetime
 import os
+import threading
 
 
 class Log(metaclass=SingletonMeta):
@@ -13,16 +14,23 @@ class Log(metaclass=SingletonMeta):
         if not hasattr(self, "initialized"):
             self.transactions_log_path = transactions_log_path
             self.actions_log_path = actions_log_path
+            # Create locks for each log file
+            self.transactions_log_lock = threading.Lock()
+            self.actions_log_lock = threading.Lock()
             # checks log directories exist
             os.makedirs(os.path.dirname(transactions_log_path), exist_ok=True)
             os.makedirs(os.path.dirname(actions_log_path), exist_ok=True)
             self.initialized = True
 
     def log_transaction(self, message):
-        self._write_log(message, self.transactions_log_path)
+        # Use the transactions lock
+        with self.transactions_log_lock:
+            self._write_log(message, self.transactions_log_path)
 
     def log_action(self, message):
-        self._write_log(message, self.actions_log_path)
+        # Use the actions lock
+        with self.actions_log_lock:
+            self._write_log(message, self.actions_log_path)
 
     def _write_log(self, message, file_path):
         with open(file_path, "a") as log_file:

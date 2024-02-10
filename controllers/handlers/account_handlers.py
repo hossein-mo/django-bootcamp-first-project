@@ -30,6 +30,7 @@ class AddAccount(AbstractHandler):
             return super().handle(data)
         else:
             return data
+        
 class UserAccounts(AbstractHandler):
     def handle(self, data: dict) -> dict:
         user = data["user"]

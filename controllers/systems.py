@@ -5,8 +5,8 @@ from typing import List
 sys.path.append(os.path.dirname(os.path.dirname(__file__)))
 import controllers.handlers.user_handlers as uHandlers
 import controllers.handlers.account_handlers as baHandlers
-import controllers.exceptions as cExcept
-import models.model_exceptions as mExcept
+import utils.exceptions as Excs
+from loging.log import Log
 from models.models import User, BankAccount
 from models.base_models import UserRole
 from controllers.autorization import authorize
@@ -14,6 +14,7 @@ from utils.utils import create_response
 
 
 class UserManagement:
+    loging: Log
 
     @staticmethod
     def login(data: dict):
@@ -45,12 +46,13 @@ class UserManagement:
         elif request["type"] == "signup":
             user = UserManagement.sign_up(data)
         else:
-            raise cExcept.AuthenticationFaild
+            raise Excs.AuthenticationFaild
         return user
 
     @staticmethod
     def client_authenticatation(request, role: UserRole = UserRole.USER):
         user = None
+
         if request["type"] == "signup":
             request["data"]["role"] = role
         try:
@@ -58,21 +60,17 @@ class UserManagement:
             response = create_response(
                 True, "user", "Authentication succesfull.", user.info()
             )
-        except mExcept.WrongCredentials:
-            print("Invalid Credentials")
+        except Excs.WrongCredentials:
             response = create_response(
                 False, "user", "Wrong credential, please try again!"
             )
-        except cExcept.InvalidUserInfo as err:
-            print(err)
-            response = create_response(False, "user", "Invalid user info!")
-        except cExcept.PasswordPolicyNotPassed:
-            response = create_response(False, "user", "Invalid password!")
-        except mExcept.DuplicatedEntry as err:
-            print(err)
+        except Excs.InvalidUserInfo as err:
+            response = create_response(False, "user", err.message)
+        except Excs.PasswordPolicyNotPassed:
+            response = create_response(False, "user", err.message)
+        except Excs.DuplicatedEntry as err:
             response = create_response(False, "user", "Username or email are in use!")
-        except cExcept.AuthenticationFaild as err:
-            print(err)
+        except Excs.AuthenticationFaild as err:
             response = create_response(
                 False, "user", "User authentication faild. Please login."
             )
@@ -82,6 +80,9 @@ class UserManagement:
     @staticmethod
     def edit_profile(user: User, data: dict):
         data["user"] = user
+        username = user.username
+        useremail = user.email
+        userphone = user.phone_number
         handler = uHandlers.UsernameVerification()
         email = uHandlers.EmailVerification()
         phone_number = uHandlers.PhoneVerification()
@@ -89,14 +90,14 @@ class UserManagement:
         handler.set_next(email).set_next(phone_number).set_next(profile_update)
         try:
             handler.handle(data)
-            response = create_response(
-                True, "user", "Authentication succesfull.", user.info()
+            response = create_response(True, "user", "Profile updated.", user.info())
+            UserManagement.loging.log_action(
+                    f"User changed its user info. username: {username} -> {user.username}" +\
+                    f"email: {useremail} -> {user.email}, {userphone} -> {user.phone_number}"
             )
-        except cExcept.InvalidUserInfo as err:
-            print(err)
-            response = create_response(False, "user", "Invalid user info!")
-        except mExcept.DuplicatedEntry as err:
-            print(err)
+        except Excs.InvalidUserInfo as err:
+            response = create_response(False, "user", err.message)
+        except Excs.DuplicatedEntry as err:
             response = create_response(False, "user", "Username or email are in use!")
         finally:
             return response, user
@@ -112,10 +113,15 @@ class UserManagement:
             response = create_response(
                 True, "user", "Password succecfully changed!", user.info()
             )
-        except cExcept.PasswordPolicyNotPassed as err:
-            print(err)
+            UserManagement.loging.log_action(
+                f"User with username {user.username} changed its password"
+            )
+        except Excs.PasswordPolicyNotPassed as err:
             response = create_response(False, "user", err.message)
-        except mExcept.WrongCredentials as err:
+        except Excs.WrongCredentials as err:
+            UserManagement.loging.log_action(
+                f"Wrong credentials for changing password. username: {user.username}."
+            )
             response = create_response(False, "user", err.message)
         finally:
             return response
@@ -130,11 +136,15 @@ class UserManagement:
     def change_user_role(user: User, data: dict):
         change_role = uHandlers.ChangeUserRole()
         try:
-            change_role.handle(data)
+            data = change_role.handle(data)
             res_message = f"User role succesfully changed!"
             res_status = True
-        except cExcept.InvalidUserInfo as err:
-            print(err)
+            affected = data["affected"]
+            UserManagement.loging.log_action(
+                f"user with username {affected.username} role changed to {affected.role} "+\
+                f"by admin with username {user.username} and id {user.id}"
+            )
+        except Excs.InvalidUserInfo as err:
             res_message = err.message
             res_status = False
         response = create_response(res_status, "user", res_message)
@@ -142,25 +152,32 @@ class UserManagement:
 
 
 class AccountManagement:
+    loging: Log
+
     @staticmethod
     def add_account_user(user: User, data: dict) -> dict:
-        data = {'user': user, 'card_info': data}
+        data = {"user": user, "card_info": data}
         account = baHandlers.AddAccount()
         try:
             data = account.handle(data)
-            return create_response(True, 'account', "Bank account has been added to your profile.", data['card_info'])
-        except KeyError as err:
-            return create_response(False, 'account', "Invalid card info.")
-        except TypeError as err:
-            return create_response(False, 'account', "Invalid card info.")
-        except cExcept.InvalidRequest as err:
-            return create_response(False, 'account', err.message)
-            
+            AccountManagement.loging.log_action(
+                f"New bank account added for user. username: {user.username}, id: {user.id}"
+            )
+            return create_response(
+                True,
+                "account",
+                "Bank account has been added to your profile.",
+                data["card_info"],
+            )
+        except Excs.InvalidRequest as err:
+            return create_response(False, "account", err.message)
 
     @staticmethod
     def get_user_accounts(user) -> List[BankAccount]:
         user_accs = BankAccount.fetch_obj(where=f"{BankAccount.user_id} = {user.id}")
-        return create_response(True, 'account', "", data={'accounts': [acc.info() for acc in user_accs]})
+        return create_response(
+            True, "account", "", data={"accounts": [acc.info() for acc in user_accs]}
+        )
 
     # @staticmethod
     # def wallet_deposit(user: User, account_id: int) -> None:

@@ -1,17 +1,17 @@
-class InsertFailed(Exception):
-    def __init__(self, message):
+class DatabaseError(Exception):
+    def __init__(self, message: str = "Something went wrong with the database.") -> None:
         self.message = message
         super().__init__(self.message)
 
 
-class DeleteFailed(Exception):
-    def __init__(self, message):
+class DuplicatedEntry(Exception):
+    def __init__(self, message: str) -> None:
         self.message = message
         super().__init__(self.message)
 
 
-class UpdateFailed(Exception):
-    def __init__(self, message):
+class WrongCredentials(Exception):
+    def __init__(self, message: str = "Wrong User Credentials"):
         self.message = message
         super().__init__(self.message)
 
@@ -46,6 +46,9 @@ class InvalidRequest(Exception):
         self.message = message
         super().__init__(self.message)
 
+
 class WrongBankAccCreds(Exception):
-    def __init__(self, message: str = "Wrong bank account credentials, please try again!") -> None:
+    def __init__(
+        self, message: str = "Wrong bank account credentials, please try again!"
+    ) -> None:
         super().__init__(message)

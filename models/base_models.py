@@ -8,7 +8,7 @@ from mysql.connector import IntegrityError
 sys.path.append(os.path.dirname(os.path.dirname(__file__)))
 from models.database import DatabaseConnection
 from models.model_exceptions import DuplicatedEntry
-from log.log import Log
+from loging.log import Log
 
 class Column:
     def __init__(

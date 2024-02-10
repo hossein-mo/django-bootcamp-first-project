@@ -5,7 +5,7 @@ from pathlib import Path
 from models.base_models import BaseModel
 from models.database import DatabaseConnection
 from mysql.connector import Error as dbError
-from log.log import Log
+from loging.log import Log
 
 
 class initialize:

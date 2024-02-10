@@ -7,19 +7,21 @@ from pathlib import Path
 class Log(metaclass=SingletonMeta):
     def __init__(
         self,
-        transactions_log_path: str = "transactions.log",
-        actions_log_path: str = "cinema.log",
+        location = 'default',
     ):
         # checks if the instance is already initialized
         if not hasattr(self, "initialized"):
-            self.transactions_log_path = Path(__file__).parent.parent.joinpath(transactions_log_path)
-            self.actions_log_path = Path(__file__).parent.parent.joinpath(actions_log_path)
+            if location == 'default':
+                logs_root = Path(__file__).parent.parent.joinpath('logs')
+            else:
+                logs_root = Path(location)
+            os.makedirs(logs_root, exist_ok=True)
+            self.transactions_log_path = logs_root.joinpath("transactions.log")
+            self.actions_log_path = logs_root.joinpath("cinema.log")
             # Create locks for each log file
             self.transactions_log_lock = threading.Lock()
             self.actions_log_lock = threading.Lock()
             # checks log directories exist
-            os.makedirs(Path(__file__).parent.parent, exist_ok=True)
-            os.makedirs(Path(__file__).parent.parent, exist_ok=True)
             self.initialized = True
 
     def log_transaction(self, message):

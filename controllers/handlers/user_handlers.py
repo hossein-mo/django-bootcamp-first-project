@@ -38,7 +38,7 @@ class PhoneVerification(AbstractHandler):
     def handle(self, data: dict) -> dict | None:
         if 'phone_number' not in data:
             data['phone_number'] = None
-        else:
+        elif data['phone_number']:
             phone_pattern = re.compile(r"^(09[0-3][0-9]-?[0-9]{3}-?[0-9]{4})$")
             if not bool(phone_pattern.match(data["phone_number"])):
                 raise InvalidUserInfo(

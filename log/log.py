@@ -18,7 +18,6 @@ class Log(metaclass=SingletonMeta):
             self.transactions_log_lock = threading.Lock()
             self.actions_log_lock = threading.Lock()
             # checks log directories exist
-            print()
             os.makedirs(Path(__file__).parent.parent, exist_ok=True)
             os.makedirs(Path(__file__).parent.parent, exist_ok=True)
             self.initialized = True

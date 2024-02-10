@@ -8,7 +8,7 @@ from mysql.connector import IntegrityError
 sys.path.append(os.path.dirname(os.path.dirname(__file__)))
 from models.database import DatabaseConnection
 from models.model_exceptions import DuplicatedEntry
-
+from log.log import Log
 
 class Column:
     def __init__(
@@ -89,6 +89,7 @@ class Column:
 class BaseModel:
     name: str
     db_obj: DatabaseConnection
+    log_obj: Log
 
     @classmethod
     def create_new(cls, **kwargs):

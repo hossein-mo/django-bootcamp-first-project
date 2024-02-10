@@ -25,6 +25,7 @@ if __name__ == "__main__":
     config_path = root_path.joinpath('config.ini')
     config = config_loader(config_path)
     db = initialize.run_db_connection(config['database'])
+    log = initialize.run_log_module()
     initialize.create_tables(db)
     server = TCPServer(**config['server'])
     server.start_server()

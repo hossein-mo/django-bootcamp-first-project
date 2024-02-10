@@ -2,24 +2,25 @@ from models.meta import SingletonMeta
 from datetime import datetime
 import os
 import threading
-
+from pathlib import Path
 
 class Log(metaclass=SingletonMeta):
     def __init__(
         self,
-        transactions_log_path="./transactions.log",
-        actions_log_path="./cinema.log",
+        transactions_log_path: str = "transactions.log",
+        actions_log_path: str = "cinema.log",
     ):
         # checks if the instance is already initialized
         if not hasattr(self, "initialized"):
-            self.transactions_log_path = transactions_log_path
-            self.actions_log_path = actions_log_path
+            self.transactions_log_path = Path(__file__).parent.parent.joinpath(transactions_log_path)
+            self.actions_log_path = Path(__file__).parent.parent.joinpath(actions_log_path)
             # Create locks for each log file
             self.transactions_log_lock = threading.Lock()
             self.actions_log_lock = threading.Lock()
             # checks log directories exist
-            os.makedirs(os.path.dirname(transactions_log_path), exist_ok=True)
-            os.makedirs(os.path.dirname(actions_log_path), exist_ok=True)
+            print()
+            os.makedirs(Path(__file__).parent.parent, exist_ok=True)
+            os.makedirs(Path(__file__).parent.parent, exist_ok=True)
             self.initialized = True
 
     def log_transaction(self, message):

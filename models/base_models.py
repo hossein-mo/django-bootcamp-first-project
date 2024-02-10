@@ -128,7 +128,7 @@ class BaseModel:
         Returns:
             str: Create table query.
         """
-        query = f"CREATE TABLE {cls.name} (\n"
+        query = f"CREATE TABLE IF NOT EXISTS `{cls.name}` (\n"
         primary_keys = []
         unique_keys = []
         foreign_keys = {}
@@ -185,7 +185,7 @@ class BaseModel:
         Returns:
             dict: List of fetched rows as dictionary of selected columns
         """
-        query = f'SELECT {",".join(select)} FROM {cls.name}'
+        query = f'SELECT {",".join(select)} FROM `{cls.name}`'
         if where:
             query = f"{query} WHERE {where}"
         if order_by:
@@ -272,7 +272,7 @@ class BaseModel:
         column_names = [column.name for column in columns]
         clm = ", ".join(tuple(column_names))
         values = self.get_comma_seperated(columns)
-        query = f"INSERT INTO {cls.name} ({clm})\nVALUES ({values[:-1]});"
+        query = f"INSERT INTO `{cls.name}` ({clm})\nVALUES ({values[:-1]});"
         try:
             _, rowid = self.db_obj.execute(query)
         except IntegrityError as err:
@@ -392,9 +392,3 @@ class UserRole(BaseEnum, metaclass=MetaEnum):
 
     def __str__(self) -> str:
         return str(self.value)
-
-
-class Backend:
-    @staticmethod
-    def run_db_connection(dbconf: dict) -> None:
-        BaseModel.db_obj = DatabaseConnection(**dbconf)

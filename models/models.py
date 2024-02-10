@@ -364,12 +364,19 @@ class Movie(BaseModel):
 
 class MovieRate(BaseModel):
     name = "movie_rate"
-    id = Column("id", "INT UNSIGNED", primary_key=True, auto_increment=True)
     user_id = Column(
-        "user_id", "INT UNSIGNED", foreign_key=User.id.name, reference=User.name
+        "user_id",
+        "INT UNSIGNED",
+        primary_key=True,
+        foreign_key=User.id.name,
+        reference=User.name,
     )
     movie_id = Column(
-        "movie_id", "INT UNSIGNED", foreign_key=Movie.id.name, reference=Movie.name
+        "movie_id",
+        "INT UNSIGNED",
+        primary_key=True,
+        foreign_key=Movie.id.name,
+        reference=Movie.name,
     )
     rate = Column("rate", "INT UNSIGNED")
 
@@ -501,15 +508,19 @@ class Theater(BaseModel):
         self.Capacity = capacity
 
 
-class Theater_Rate(BaseModel):
+class TheaterRate(BaseModel):
     name = "theater_rate"
-    id = Column("id", "INT UNSIGNED", primary_key=True, auto_increment=True)
     user_id = Column(
-        "user_id", "INT UNSIGNED", foreign_key=User.id.name, reference=User.name
+        "user_id",
+        "INT UNSIGNED",
+        primary_key=True,
+        foreign_key=User.id.name,
+        reference=User.name,
     )
     theater_id = Column(
         "theater_id",
         "INT UNSIGNED",
+        primary_key=True,
         foreign_key=Theater.id.name,
         reference=Theater.name,
     )
@@ -530,8 +541,8 @@ class Theater_Rate(BaseModel):
         self.theater_id = theater_id
 
 
-class Show(BaseModel):
-    name = "show"
+class Showtime(BaseModel):
+    name = "showtime"
     id = Column("id", "INT UNSIGNED", primary_key=True, auto_increment=True)
     movie_id = Column(
         "movie_id", "INT UNSIGNED", foreign_key=Movie.id.name, reference=Movie.name
@@ -566,22 +577,16 @@ class Show(BaseModel):
         self.movie = movie
         self.theater = theater
 
-    def add_show(self):
-        self.insert()
-
-    def update_show(self):
+    def update_showtime(self):
         self.update(
             {
-                Show.movie_id: self.movie_id,
-                Show.theater_id: self.theater_id,
-                Show.start_date: self.start_date,
-                Show.end_date: self.end_date,
-                Show.price: self.price,
+                Showtime.movie_id: self.movie_id,
+                Showtime.theater_id: self.theater_id,
+                Showtime.start_date: self.start_date,
+                Showtime.end_date: self.end_date,
+                Showtime.price: self.price,
             }
         )
-
-    def delete_show(self):
-        self.delete()
 
     def get_reserved_seat(self) -> list[int]:
         """Returns reserved seat numbers of given show
@@ -589,18 +594,18 @@ class Show(BaseModel):
         Returns:
             list: List of reserved seat number
         """
-        results = Show.fetch(
+        results = Showtime.fetch(
             select=Order.seat_number.name,
-            where=f"{Order.show_id.name} = {self.id} AND {Order.cancel_date.name} IS NULL",
+            where=f"{Order.showtime_id.name} = {self.id} AND {Order.cancel_date.name} IS NULL",
         )
         return [d[Order.seat_number.name] for d in results]
 
-    def get_show_capacity(self) -> int:
+    def get_showtime_capacity(self) -> int:
         """Returns the number of reserved seats"""
         reserved_seats = "reserved_seats"
-        results = Show.fetch(
+        results = Showtime.fetch(
             select=f"COUNT(*) as reserved_seats",
-            where=f"{Order.show_id.name} = {self.id} AND {Order.cancel_date.name} IS NULL",
+            where=f"{Order.showtime_id.name} = {self.id} AND {Order.cancel_date.name} IS NULL",
         )
         return results[0][reserved_seats]
 
@@ -611,26 +616,26 @@ class Show(BaseModel):
         Returns:
             list: List of Movies
         """
-        show_id, movie_id, theater_id, rate = "s_id", "m_id", "t_id", "rate"
+        showtime_id, movie_id, theater_id, rate = "s_id", "m_id", "t_id", "rate"
         sub_query = f"SELECT m.*, rate from {Movie.name} m \
                         LEFT JOIN (SELECT {MovieRate.movie_id.name}, \
                         SUM({MovieRate.rate.name})/COUNT({MovieRate.rate.name}) as {rate} from {MovieRate.name} \
                         GROUP BY {MovieRate.movie_id.name}) rt ON m.{Movie.id.name}=rt.{MovieRate.movie_id.name})"
-        query = f"SELECT s.*, s.id as {show_id}, m.*, m.id as {movie_id}, th.*, th.id as {theater_id} \
-                    FROM {Show.name} s \
-                    JOIN {sub_query} m ON s.{Show.movie_id.name} = m.{Movie.id.name} \
-                    JOIN {Theater.name} th ON s.{Show.theater_id.name} = th.{Theater.id.name} \
-                    WHERE s.{Show.start_date.name} > now()"
+        query = f"SELECT s.*, s.id as {showtime_id}, m.*, m.id as {movie_id}, th.*, th.id as {theater_id} \
+                    FROM {Showtime.name} s \
+                    JOIN {sub_query} m ON s.{Showtime.movie_id.name} = m.{Movie.id.name} \
+                    JOIN {Theater.name} th ON s.{Showtime.theater_id.name} = th.{Theater.id.name} \
+                    WHERE s.{Showtime.start_date.name} > now()"
         results = cls.db_obj.execute(query)
         list = []
         for item in results:
             show_obj = cls(
-                item[Show.movie_id.name],
-                item[Show.theater_id.name],
-                item[Show.start_date.name],
-                item[Show.end_date.name],
-                item[Show.price.name],
-                item[show_id],
+                item[Showtime.movie_id.name],
+                item[Showtime.theater_id.name],
+                item[Showtime.start_date.name],
+                item[Showtime.end_date.name],
+                item[Showtime.price.name],
+                item[showtime_id],
             )
             show_obj.movie = Movie(
                 item[Movie.m_name.name],
@@ -652,11 +657,11 @@ class Order(BaseModel):
     user_id = Column(
         "user_id", "INT UNSIGNED", foreign_key=User.id.name, reference=User.name
     )
-    show_id = Column(
-        "show_id",
+    showtime_id = Column(
+        "showtime_id",
         "INT UNSIGNED",
-        foreign_key=Show.id.name,
-        reference=Show.name,
+        foreign_key=Showtime.id.name,
+        reference=Showtime.name,
     )
     seat_number = Column("seat_number", "SMALLINT UNSIGNED")
     discount = Column("discount", "SMALLINT UNSIGNED")
@@ -666,7 +671,7 @@ class Order(BaseModel):
     def __init__(
         self,
         user_id,
-        show_id,
+        showtime_id,
         seat_number,
         discount,
         create_date=datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
@@ -675,7 +680,7 @@ class Order(BaseModel):
     ):
         self.id = id
         self.user_id = user_id
-        self.show_id = show_id
+        self.showtime_id = showtime_id
         self.seat_number = seat_number
         self.discount = discount
         self.create_date = create_date
@@ -695,13 +700,13 @@ class Order(BaseModel):
         Returns:
             None
         """
-        show_price = Show.fetch(
-            select=f"{Show.price}", where=f"{Show.id} = {self.show_id}"
-        )[0][Show.price.name]
+        showtime_price = Showtime.fetch(
+            select=f"{Showtime.price}", where=f"{Showtime.id} = {self.showtime_id}"
+        )[0][Showtime.price.name]
         current_date = datetime.now()
         formatted_date = current_date.strftime("%Y-%m-%d %H:%M:%S")
         query1 = user.update_query(
-            {User.balance: user.balance + show_price * ((100 - fine) / 100)}
+            {User.balance: user.balance + showtime_price * ((100 - fine) / 100)}
         )
         query2 = self.update_query({Order.cancel_date: formatted_date})
         try:

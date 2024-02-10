@@ -5,7 +5,7 @@ from configparser import ConfigParser
 
 sys.path.append(Path(__file__).parent)
 from controllers.server import TCPServer
-from models.base_models import Backend
+from models.initialize import initialize
 
 def config_loader(config_path: str) -> dict:
     config = ConfigParser()
@@ -24,6 +24,7 @@ if __name__ == "__main__":
     root_path = Path(__file__).parent
     config_path = root_path.joinpath('config.ini')
     config = config_loader(config_path)
-    Backend.run_db_connection(config['database'])
+    db = initialize.run_db_connection(config['database'])
+    initialize.create_tables(db)
     server = TCPServer(**config['server'])
     server.start_server()

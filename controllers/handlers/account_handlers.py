@@ -6,7 +6,7 @@ from typing import Any, Dict, Optional, List
 from random import randint
 sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(__file__))))
 from controllers.handlers.abstract_handler import AbstractHandler
-from controllers.exceptions import NotEnoughBalance, InvalidRequest, WrongBankAccCreds
+from utils.exceptions import NotEnoughBalance, InvalidRequest, WrongBankAccCreds
 from models.models import User, BankAccount
 from utils.utils import hash_password
 
@@ -22,7 +22,6 @@ class AddAccount(AbstractHandler):
             card_info['balance'] = randint(1000000,3000000)
             card_info['user_id'] = user.id
             b_account = BankAccount.create_new(**card_info)
-            b_account.insert()
             data['card_info'] = b_account.info()
         else:
             raise InvalidRequest("Duplicated card number, please add another card.")

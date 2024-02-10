@@ -9,10 +9,7 @@ sys.path.append(os.path.dirname(os.path.dirname(__file__)))
 
 from utils.utils import hash_password
 from models.base_models import Column, UserRole, BaseModel
-from models.model_exceptions import (
-    WrongCredentials,
-    DuplicatedEntry,
-)
+from utils.exceptions import WrongCredentials, DuplicatedEntry, DatabaseError
 
 
 class User(BaseModel):
@@ -102,17 +99,26 @@ class User(BaseModel):
         """
         password = hash_password(usercred["password"])
         if "username" in usercred:
+            login_with = "username"
+            cred = usercred["username"]
             user = User.fetch_obj(where=f'{User.username} = "{usercred["username"]}"')
         else:
+            login_with = "email"
+            cred = usercred["email"]
             user = User.fetch_obj(where=f'{User.email} = "{usercred["email"]}"')
         if not user:
-            print("user doesn't exist")
-            raise WrongCredentials
+            err = WrongCredentials()
+            User.loging.log_action(f"{err.message} {login_with} = {cred}")
+            raise err
         else:
             user = user[0]
             if user.password != password:
-                print("wrong password")
-                raise WrongCredentials
+                err = WrongCredentials()
+                User.loging.log_action(f"{err.message} {login_with} = {cred}")
+                raise err
+            User.loging.log_action(
+                f"User logged in with user id = {user.id} username = {user.username} and email = {user.email}"
+            )
             return user
 
     @classmethod
@@ -152,13 +158,9 @@ class User(BaseModel):
             rightnow,
             rightnow,
         )
-        try:
-            user.insert()
-        except DuplicatedEntry as err:
-            print("entered username or email is taken")
-            raise
-        else:
-            return user
+        user.insert()
+        User.loging.log_action(f"New user registerd. userinfo: {user.info()}")
+        return user
 
 
 class BankAccount(BaseModel):
@@ -249,14 +251,10 @@ class BankAccount(BaseModel):
         dest_cls = dest.__class__
         query1 = origin.update_query({origin_cls.balance: origin.balance - amount})
         query2 = dest.update_query({dest_cls.balance: dest.balance + amount})
-        try:
-            origin_cls.db_obj.transaction([query1, query2])
-            origin.balance -= amount
-            dest.balance += amount
-            return True
-        except dbError as err:
-            print(f"Error description: {err}")
-            return False
+        origin_cls.db_obj.transaction([query1, query2])
+        origin.balance -= amount
+        dest.balance += amount
+        return True
 
     @classmethod
     def create_new(
@@ -275,7 +273,10 @@ class BankAccount(BaseModel):
             BankAccount: return an instance of BankAccount with hashed password
         """
         password = hash_password(password)
-        return cls(card_number, cvv2, password, balance, user_id)
+        account = cls(card_number, cvv2, password, balance, user_id)
+        account.insert()
+        User.loging.log_action(f"New bank account added. card_number: {account.card_number}, user_id: {account.user_id}")
+        return account
 
 
 class Subscription(BaseModel):

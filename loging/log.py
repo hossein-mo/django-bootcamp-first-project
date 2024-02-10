@@ -18,11 +18,25 @@ class Log(metaclass=SingletonMeta):
             os.makedirs(logs_root, exist_ok=True)
             self.transactions_log_path = logs_root.joinpath("transactions.log")
             self.actions_log_path = logs_root.joinpath("cinema.log")
+            self.errors_log_path = logs_root.joinpath("errors.log")
+            self.info_log_path = logs_root.joinpath("info.log")
             # Create locks for each log file
             self.transactions_log_lock = threading.Lock()
             self.actions_log_lock = threading.Lock()
+            self.errors_log_lock = threading.Lock()
+            self.info_log_lock = threading.Lock()
             # checks log directories exist
             self.initialized = True
+
+    def log_info(self, message):
+        # Use the transactions lock
+        with self.info_log_lock:
+            self._write_log(message, self.info_log_path)
+
+    def log_errors(self, message):
+        # Use the transactions lock
+        with self.errors_log_lock:
+            self._write_log(message, self.errors_log_path)
 
     def log_transaction(self, message):
         # Use the transactions lock

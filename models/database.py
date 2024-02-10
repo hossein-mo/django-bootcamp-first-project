@@ -6,9 +6,12 @@ from typing import List, Tuple
 
 sys.path.append(os.path.dirname(os.path.dirname(__file__)))
 from models.meta import SingletonMeta
+from loging.log import Log
+from utils.exceptions import DatabaseError
 
 
 class DatabaseConnection(metaclass=SingletonMeta):
+    loging: Log
 
     def create_db_if_not_exist(self, db_config: dict) -> None:
         """Create database if it doesn't exist.
@@ -54,7 +57,8 @@ class DatabaseConnection(metaclass=SingletonMeta):
         try:
             self.create_db_if_not_exist(self.__dbconfig)
         except mysql.connector.Error as err:
-            print(f"Error: {err}")
+            self.loging.log_errors(err.msg)
+            raise DatabaseError
         else:
             self.__dbconfig["database"] = self.db_name
             self.pool = pooling.MySQLConnectionPool(
@@ -116,7 +120,7 @@ class DatabaseConnection(metaclass=SingletonMeta):
             connection.commit()
         except mysql.connector.Error as err:
             connection.rollback()
-            raise
+            raise DatabaseError
         else:
             rowscount = cursor.rowcount
             return rowscount

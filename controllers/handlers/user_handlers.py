@@ -6,9 +6,8 @@ from typing import Any, Dict, Optional
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(__file__))))
 from controllers.handlers.abstract_handler import AbstractHandler
-from controllers.exceptions import PasswordPolicyNotPassed, InvalidUserInfo
+from utils.exceptions import PasswordPolicyNotPassed, InvalidUserInfo, DuplicatedEntry, WrongCredentials
 from models.models import User, UserRole
-from models.model_exceptions import DuplicatedEntry, WrongCredentials
 from utils.utils import hash_password
 
 
@@ -86,11 +85,8 @@ class PasswordPolicyVerification(AbstractHandler):
 
 class CreateUserHandler(AbstractHandler):
     def handle(self, data: dict) -> dict:
-        try:
-            user = User.create_new(**data)
-            data["user"] = user
-        except DuplicatedEntry as err:
-            raise
+        user = User.create_new(**data)
+        data["user"] = user
         if self._next_handler:
             return super().handle(data)
         else:
@@ -118,16 +114,13 @@ class ProfileInfoUpdate(AbstractHandler):
         new_email = data["email"]
         new_phone_number = data["phone_number"]
         user = data["user"]
-        try:
-            user.update(
-                {
-                    User.username: new_username,
-                    User.email: new_email,
-                    User.phone_number: new_phone_number,
-                }
-            )
-        except DuplicatedEntry as err:
-            raise
+        user.update(
+            {
+                User.username: new_username,
+                User.email: new_email,
+                User.phone_number: new_phone_number,
+            }
+        )
         if self._next_handler:
             return super().handle(data)
         else:
@@ -136,17 +129,13 @@ class ProfileInfoUpdate(AbstractHandler):
 
 class LoginHandler(AbstractHandler):
     def handle(self, data: dict) -> dict | None:
-        try:
-            user = User.autenthicate(data)
-            user.update_last_login()
-            data["user"] = user
-        except WrongCredentials as err:
-            raise
+        user = User.autenthicate(data)
+        user.update_last_login()
+        data["user"] = user
+        if self._next_handler:
+            return super().handle(data)
         else:
-            if self._next_handler:
-                return super().handle(data)
-            else:
-                return data
+            return data
 
 
 class ChangeUserRole(AbstractHandler):
@@ -162,6 +151,7 @@ class ChangeUserRole(AbstractHandler):
                 affected_user = affected_user[0]
                 affected_user.role = UserRole(data['new_role'])
                 affected_user.update({User.role: affected_user.role})
+                data['affected'] = affected_user
             else:
                 raise InvalidUserInfo('User not found')
             if self._next_handler:

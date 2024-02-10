@@ -1,10 +1,8 @@
-import inspect
-import importlib.util
 import models.models as mod
-from pathlib import Path
+import controllers.systems as systms
 from models.base_models import BaseModel
 from models.database import DatabaseConnection
-from mysql.connector import Error as dbError
+from controllers.server import TCPServer
 from loging.log import Log
 
 
@@ -16,9 +14,14 @@ class initialize:
         return db
 
     @staticmethod
-    def run_log_module() -> Log:
-        log = Log()
-        BaseModel.log_obj = log
+    def run_log_module(location: str = "default") -> Log:
+        log = Log(location=location)
+        DatabaseConnection.loging = log
+        BaseModel.loging = log
+        TCPServer.loging = log
+        systms.UserManagement.loging = log
+        systms.AccountManagement.loging = log
+
         return log
 
     @staticmethod

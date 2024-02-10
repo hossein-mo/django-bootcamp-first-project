@@ -8,13 +8,16 @@ from typing import Tuple
 sys.path.append(os.path.dirname(os.path.dirname(__file__)))
 
 from utils.utils import create_response
+from utils.exceptions import DatabaseError
 from controllers.systems import UserManagement, AccountManagement
+from loging.log import Log
 
 
 class TCPServer:
     HOST: str
     PORT: int
     SIZE_BYTES_LENGTH: int
+    loging: Log
 
     def __init__(
         self, host: str = "localhost", port: int = 8000, size_length: int = 4
@@ -47,44 +50,68 @@ class TCPServer:
     @staticmethod
     def client_handler(client_socket: socket.socket, size_length: int):
         request = TCPServer.socket_recive(client_socket, size_length)
-        if "type" in request:
+        try:
             response, user = UserManagement.client_authenticatation(request)
-        else:
-            user = None
-            response = create_response(False, "user", "Please login.")
+        except DatabaseError as err:
+            response = create_response(
+                False,
+                "user",
+                "We had a problem processing your request. Please try again later.",
+            )
+        except (KeyError, TypeError) as err:
+            response = create_response(False, "user", "Invalid request.")
         TCPServer.socket_send(client_socket, response, size_length)
         if user:
             while True:
                 request = TCPServer.socket_recive(client_socket, size_length)
-                if not request:
-                    break
-                if request["type"] == "profile":
-                    if request["subtype"] == "update":
-                        response, user = UserManagement.edit_profile(
-                            user, request["data"]
-                        )
-                    elif request["subtype"] == "changepass":
-                        response = UserManagement.change_password(
-                            user, request["data"]
-                        )
-                    elif request["subtype"] == "changerole":
-                        response = UserManagement.change_user_role(user, request["data"])
-                elif request['type'] == 'account':
-                    if request['subtype'] == 'add':
-                        response = AccountManagement.add_account_user(user, request["data"])
-                    elif request['subtype'] == 'list':
-                        response = AccountManagement.get_user_accounts(user)
+                try:
+                    if not request:
+                        break
+                    if request["type"] == "profile":
+                        if request["subtype"] == "update":
+                            response, user = UserManagement.edit_profile(
+                                user, request["data"]
+                            )
+                        elif request["subtype"] == "changepass":
+                            response = UserManagement.change_password(
+                                user, request["data"]
+                            )
+                        elif request["subtype"] == "changerole":
+                            response = UserManagement.change_user_role(
+                                user, request["data"]
+                            )
+                    elif request["type"] == "account":
+                        if request["subtype"] == "add":
+                            response = AccountManagement.add_account_user(
+                                user, request["data"]
+                            )
+                        elif request["subtype"] == "list":
+                            response = AccountManagement.get_user_accounts(user)
+                except DatabaseError as err:
+                    response = create_response(
+                        False,
+                        "user",
+                        "We had a problem processing your request. Please try again later.",
+                    )
+                except (KeyError, TypeError) as err:
+                    print(err)
+                    response = create_response(False, "user", "Invalid request.")
                 TCPServer.socket_send(client_socket, response, size_length)
-
+            TCPServer.loging.log_action(f"User logged out. username: {user.username}, id: {user.id}")
+        addr = client_socket.getpeername()
         client_socket.close()
+        TCPServer.loging.log_action(f"Connection closed for {addr}")
+        
 
     def start_server(self):
         server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         server.bind((self.HOST, self.PORT))
         server.listen(5)
-        print(f"Server listening on port {self.PORT}")
+        print(f"Server listening on {self.HOST}:{self.PORT}")
+        TCPServer.loging.log_action(f"Server started and listening on {self.HOST}:{self.PORT}")
         while True:
             client, addr = server.accept()
+            TCPServer.loging.log_action(f"Connection accepted for {addr}")
             client_handler = threading.Thread(
                 target=TCPServer.client_handler, args=(client, self.SIZE_BYTES_LENGTH)
             )

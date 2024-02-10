@@ -7,8 +7,9 @@ from mysql.connector import IntegrityError
 
 sys.path.append(os.path.dirname(os.path.dirname(__file__)))
 from models.database import DatabaseConnection
-from models.model_exceptions import DuplicatedEntry
+from utils.exceptions import DuplicatedEntry, DatabaseError
 from loging.log import Log
+
 
 class Column:
     def __init__(
@@ -89,7 +90,7 @@ class Column:
 class BaseModel:
     name: str
     db_obj: DatabaseConnection
-    log_obj: Log
+    loging: Log
 
     @classmethod
     def create_new(cls, **kwargs):
@@ -168,8 +169,10 @@ class BaseModel:
         try:
             cls.db_obj.execute(query)
         except dbError as err:
-            print(f'Error while creating "{cls.name}" table.')
-            print(f"Error description: {err}")
+            cls.loging.log_errors(err.msg)
+            raise DatabaseError
+        else:
+            cls.loging.log_info(f"{cls.name} table succesfully created in the database")
 
     @classmethod
     def fetch(
@@ -200,9 +203,9 @@ class BaseModel:
         try:
             results = cls.db_obj.fetch(query)
         except dbError as err:
-            print(f'Error while fetching from "{cls.name}".')
-            print(f"Error description: {err}")
-            return []
+            cls.loging.log_errors(err.msg)
+            result = []
+            raise DatabaseError
         else:
             return results
 
@@ -277,12 +280,11 @@ class BaseModel:
         try:
             _, rowid = self.db_obj.execute(query)
         except IntegrityError as err:
-            print(f'Error while inserting new row into "{cls.name}".')
-            print(f"Error description: {err}")
+            cls.loging.log_errors(err.msg)
             raise DuplicatedEntry(err.msg)
         except dbError as err:
-            print(f'Error while inserting new row into "{cls.name}".')
-            print(f"Error description: {err}")
+            cls.loging.log_errors(err.msg)
+            raise DatabaseError
         else:
             if set_from_db:
                 self.__dict__[set_from_db.name] = rowid
@@ -331,13 +333,12 @@ class BaseModel:
         try:
             rowcount, _ = self.db_obj.execute(query)
         except IntegrityError as err:
-            print(f'Error while inserting new row into "{self.name}".')
-            print(f"Error description: {err}")
+            self.loging.log_errors(err.msg)
             raise DuplicatedEntry(err.msg)
         except dbError as err:
-            print(f'Error updating "{self.name}".')
-            print(f"Error description: {err}")
-            return 0
+            self.loging.log_errors(err.msg)
+            rowcount = 0
+            raise DatabaseError
         else:
             for column in colval:
                 self.__dict__[column.name] = colval[column]
@@ -357,9 +358,9 @@ class BaseModel:
         try:
             rowcount, _ = self.db_obj.execute(query)
         except dbError as err:
-            print(f'Error delete "{self.name}".')
-            print(f"Error description: {err}")
-            return 0
+            self.loging.log_errors(err.msg)
+            raise DatabaseError
+            rowcount = 0
         else:
             return rowcount
 

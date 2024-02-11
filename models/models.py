@@ -413,17 +413,19 @@ class Comment(BaseModel):
     movie_id = Column(
         "movie_id", "INT UNSIGNED", foreign_key=Movie.id.name, reference=Movie.name
     )
-    parent_id = Column("parent_id", "INT UNSIGNED", foreign_key=id.name, reference=name, null=True)
+    parent_id = Column(
+        "parent_id", "INT UNSIGNED", foreign_key=id.name, reference=name, null=True
+    )
     text = Column("text", "TEXT")
     created_at = Column("created_at", "DATETIME")
 
     def __init__(
         self,
-        user_id,
-        movie_id,
-        parent_id,
-        text,
-        created_at=datetime.now(),
+        user_id: int,
+        movie_id: int,
+        parent_id: int,
+        text: str,
+        created_at: datetime,
         id: Union[int, None] = None,
     ):
         self.id = id
@@ -432,11 +434,12 @@ class Comment(BaseModel):
         self.parent_id = parent_id
         self.text = text
         self.created_at = created_at
-        self.replies = []
 
     @staticmethod
-    def comment(user_id, movie_id, parent_id, text) -> None:
-        Comment(None, user_id, movie_id, parent_id, text).insert()
+    def create_new(user_id: int, movie_id: int, parent_id: int, text: str) -> None:
+        comm = Comment(user_id, movie_id, parent_id, text, datetime.now())
+        comm.insert()
+        return comm
 
     @staticmethod
     def get_comments(movie_id) -> list["Comment"]:

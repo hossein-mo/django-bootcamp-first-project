@@ -77,6 +77,7 @@ class DatabaseConnection(metaclass=SingletonMeta):
         """
         connection = self.pool.get_connection()
         cursor = connection.cursor(dictionary=True)
+        print(query)
         cursor.execute(query)
         connection.commit()
         rowscount = cursor.rowcount

@@ -409,6 +409,8 @@ class Review:
             response = Review.submmit_movie_rate(user, data)
         elif request["subtype"] == "theaterrate":
             response = Review.submmit_theater_rate(user, data)
+        elif request["subtype"] == "comment":
+            response = Review.write_comment(user, data)
         else:
             raise Excs.InvalidRequest
         return response
@@ -439,3 +441,11 @@ class Review:
         except Excs.UnvalidRate as err:
             return create_response(False, "review", err.message)
         return create_response(True, "review", "Theater review submited.")
+
+    def write_comment(user: mod.User, data: dict):
+        data['user'] = user
+        handler = rHandlers.WriteComment()
+        handler.handle(data)
+        comm = data['comment']
+        Review.loging.log_action(f"User wrote a comment. info: {comm.info()}")
+        return create_response(True, 'review', '', comm.info())

@@ -22,6 +22,7 @@ class initialize:
         systms.UserManagement.loging = log
         systms.AccountManagement.loging = log
         systms.CinemaManagement.loging = log
+        systms.Review.loging = log
 
         return log
 

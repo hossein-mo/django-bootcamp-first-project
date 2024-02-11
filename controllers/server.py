@@ -14,6 +14,7 @@ from controllers.systems import (
     AccountManagement,
     CinemaManagement,
     Reports,
+    Review,
 )
 from loging.log import Log
 
@@ -81,6 +82,10 @@ class TCPServer:
                         response = CinemaManagement.process(user, request)
                     elif request["type"] == "report":
                         response = Reports.process(user, request)
+                    elif request["type"] == "report":
+                        response = Reports.process(user, request)
+                    elif request["type"] == 'review':
+                        response = Review.process(user, request)
                     else:
                         response = create_response(False, "user", "Invalid request.")
                 except DatabaseError as err:

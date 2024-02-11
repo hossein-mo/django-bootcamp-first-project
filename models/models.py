@@ -395,12 +395,10 @@ class MovieRate(BaseModel):
         self,
         user_id,
         movie_id,
-        name: str,
         rate: int,
         id: Union[int, None] = None,
     ) -> None:
         self.id = id
-        self.name = name
         self.rate = rate
         self.user_id = user_id
         self.movie_id = movie_id
@@ -415,17 +413,19 @@ class Comment(BaseModel):
     movie_id = Column(
         "movie_id", "INT UNSIGNED", foreign_key=Movie.id.name, reference=Movie.name
     )
-    parent_id = Column("parent_id", "INT UNSIGNED", foreign_key=id.name, reference=name)
+    parent_id = Column(
+        "parent_id", "INT UNSIGNED", foreign_key=id.name, reference=name, null=True
+    )
     text = Column("text", "TEXT")
-    created_at = Column("created_at", "DATE")
+    created_at = Column("created_at", "DATETIME")
 
     def __init__(
         self,
-        user_id,
-        movie_id,
-        parent_id,
-        text,
-        created_at=datetime.now(),
+        user_id: int,
+        movie_id: int,
+        parent_id: int,
+        text: str,
+        created_at: datetime,
         id: Union[int, None] = None,
     ):
         self.id = id
@@ -434,23 +434,34 @@ class Comment(BaseModel):
         self.parent_id = parent_id
         self.text = text
         self.created_at = created_at
-        self.replies = []
 
     @staticmethod
-    def comment(user_id, movie_id, parent_id, text) -> None:
-        Comment(None, user_id, movie_id, parent_id, text).insert()
+    def create_new(user_id: int, movie_id: int, parent_id: int, text: str) -> None:
+        comm = Comment(user_id, movie_id, parent_id, text, datetime.now())
+        comm.insert()
+        return comm
 
     @staticmethod
     def get_comments(movie_id) -> list["Comment"]:
         result = []
-        comments = Comment.fetch_obj(f"{Comment.movie_id} = {movie_id}")
-        for i in range(len(comments)):
-            if comments[i].parent_id == 0:
-                result.append(comments[i])
-            for j in range(i + 1, len(comments)):
-                if comments[j].parent_id == comments[i].id:
-                    comments[i].replies.append(comments[j])
-        return result
+        query = """
+                WITH RECURSIVE CommentTree AS (
+                SELECT c.*, CAST(c.id AS CHAR(200)) AS path
+                FROM comment c
+                WHERE c.parent_id IS NULL
+
+                UNION ALL
+
+                SELECT c2.*, CONCAT(ct.path, '/', CAST(c2.id AS CHAR(200)))
+                FROM comment c2
+                INNER JOIN CommentTree ct ON c2.parent_id = ct.id
+                )
+                SELECT id, user_id, movie_id, parent_id, text, created_at
+                FROM CommentTree
+                ORDER BY path;
+                """
+        comments = Comment.db_obj.fetch(query)
+        return comments
 
 
 class UserSubscription(BaseModel):
@@ -562,12 +573,10 @@ class TheaterRate(BaseModel):
         self,
         user_id,
         theater_id,
-        name: str,
         rate: int,
         id: Union[int, None] = None,
     ) -> None:
         self.id = id
-        self.name = name
         self.rate = rate
         self.user_id = user_id
         self.theater_id = theater_id

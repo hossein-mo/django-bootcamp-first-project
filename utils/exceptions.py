@@ -1,5 +1,7 @@
 class DatabaseError(Exception):
-    def __init__(self, message: str = "Something went wrong with the database.") -> None:
+    def __init__(
+        self, message: str = "Something went wrong with the database."
+    ) -> None:
         self.message = message
         super().__init__(self.message)
 
@@ -51,4 +53,23 @@ class WrongBankAccCreds(Exception):
     def __init__(
         self, message: str = "Wrong bank account credentials, please try again!"
     ) -> None:
+        self.message = message
+        super().__init__(message)
+
+
+class TheaterNotExist(Exception):
+    def __init__(self, message: str = "Requested theater doesn't exist!") -> None:
+        self.message = message
+        super().__init__(message)
+
+
+class MovieNotExist(Exception):
+    def __init__(self, message: str = "Requested movie doesn't exist!") -> None:
+        self.message = message
+        super().__init__(message)
+
+
+class ShowTimeError(Exception):
+    def __init__(self, message: str = "Show overlaps with existing show!") -> None:
+        self.message = message
         super().__init__(message)

@@ -213,10 +213,10 @@ class CinemaManagement:
             response = CinemaManagement.add_movie(user, data)
         if request["subtype"] == "addtheater":
             response = CinemaManagement.add_theater(user, data)
-        if request["subtype"] == "theaterlist":
-            response = CinemaManagement.get_list_theaters(user)
+        if request["subtype"] == "addshow":
+            response = CinemaManagement.add_show(user, data)
         else:
-            raise Excs.InvalidRequest
+            raise KeyError
         return response
 
     @staticmethod
@@ -251,6 +251,26 @@ class CinemaManagement:
         )
         return response
 
+    @staticmethod
+    @authorize(authorized_roles={UserRole.ADMIN, UserRole.STAFF})
+    def add_show(user: mod.User, data: dict):
+        handler = cHandlers.CheckTheater()
+        movie_check = cHandlers.CheckMovie()
+        time_check = cHandlers.CheckShowTime()
+        add_show = cHandlers.AddShow()
+        try:
+            handler.set_next(movie_check).set_next(time_check).set_next(add_show)
+            data = handler.handle(data)
+            r_status = False
+            r_message = "Show has benn added!"
+            r_data = data["show"]
+        except (Excs.TheaterNotExist, Excs.MovieNotExist, Excs.ShowTimeError) as err:
+            r_status = False
+            r_message = err.message
+            r_data = {}
+        
+        return create_response(r_status, 'management', r_message, r_data)
+
 
 class Reports:
     # loging: Log
@@ -260,7 +280,7 @@ class Reports:
         data = request["data"]
         if request["subtype"] == "theaterlist":
             response = Reports.get_theaters(user)
-        if request['subtype'] == 'movielist':
+        if request["subtype"] == "movielist":
             response = Reports.get_movies(user)
         else:
             raise Excs.InvalidRequest

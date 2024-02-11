@@ -261,7 +261,7 @@ class CinemaManagement:
         try:
             handler.set_next(movie_check).set_next(time_check).set_next(add_show)
             data = handler.handle(data)
-            r_status = False
+            r_status = True
             r_message = "Show has benn added!"
             r_data = data["show"]
         except (Excs.TheaterNotExist, Excs.MovieNotExist, Excs.ShowTimeError) as err:

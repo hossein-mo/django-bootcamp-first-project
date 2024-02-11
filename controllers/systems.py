@@ -248,6 +248,19 @@ class CinemaManagement:
         )
         return response
 
+class Reports:
+    # loging: Log
+
+    @staticmethod
+    def process(user: mod.User, request: dict):
+        data = request["data"]
+        if request['subtype'] == "theaterlist":
+            response = Reports.get_list_theaters(user)
+        else:
+            raise Excs.InvalidRequest
+        return response
+    
+
     @staticmethod
     @authorize(authorized_roles={UserRole.ADMIN, UserRole.STAFF})
     def get_list_theaters(user: mod.User):

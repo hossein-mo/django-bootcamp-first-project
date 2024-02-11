@@ -9,7 +9,12 @@ sys.path.append(os.path.dirname(os.path.dirname(__file__)))
 
 from utils.utils import create_response
 from utils.exceptions import DatabaseError
-from controllers.systems import UserManagement, AccountManagement, CinemaManagement
+from controllers.systems import (
+    UserManagement,
+    AccountManagement,
+    CinemaManagement,
+    Reports,
+)
 from loging.log import Log
 
 
@@ -90,6 +95,8 @@ class TCPServer:
                             response = AccountManagement.get_user_accounts(user)
                     elif request["type"] == "management":
                         response = CinemaManagement.process(user, request)
+                    elif request["type"] == "report":
+                        response = Reports.process(user, request)
                     else:
                         response = create_response(False, "user", "Invalid request.")
                 except DatabaseError as err:
@@ -102,18 +109,21 @@ class TCPServer:
                     print(err)
                     response = create_response(False, "user", "Invalid request.")
                 TCPServer.socket_send(client_socket, response, size_length)
-            TCPServer.loging.log_action(f"User logged out. username: {user.username}, id: {user.id}")
+            TCPServer.loging.log_action(
+                f"User logged out. username: {user.username}, id: {user.id}"
+            )
         addr = client_socket.getpeername()
         client_socket.close()
         TCPServer.loging.log_action(f"Connection closed for {addr}")
-        
 
     def start_server(self):
         server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         server.bind((self.HOST, self.PORT))
         server.listen(5)
         print(f"Server listening on {self.HOST}:{self.PORT}")
-        TCPServer.loging.log_action(f"Server started and listening on {self.HOST}:{self.PORT}")
+        TCPServer.loging.log_action(
+            f"Server started and listening on {self.HOST}:{self.PORT}"
+        )
         while True:
             client, addr = server.accept()
             TCPServer.loging.log_action(f"Connection accepted for {addr}")

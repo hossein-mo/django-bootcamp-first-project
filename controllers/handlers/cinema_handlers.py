@@ -70,7 +70,7 @@ class CheckTheater(AbstractHandler):
 class CheckMovie(AbstractHandler):
     def handle(self, data: dict) -> dict | None:
         movie_id = int(data["movie_id"])
-        movie = Movie.fetch(where=f'{Movie.id}="{movie_id}"')
+        movie = Movie.fetch_obj(where=f'{Movie.id}="{movie_id}"')
         if not movie:
             raise MovieNotExist
         data["movie"] = movie[0]
@@ -105,7 +105,7 @@ class CheckShowTime(AbstractHandler):
                 message=f"Show overlaps with existing show, overlaping show id: {show['id']}"
             )
         show_duration = (end_date - start_date).total_seconds() / 60
-        movie_duration = data["movie"]["duration"]
+        movie_duration = data["movie"].duration
         if show_duration < movie_duration:
             raise ShowTimeError(
                 message=f"Show duration of {show_duration} minutes "
@@ -121,8 +121,12 @@ class CheckShowTime(AbstractHandler):
 
 class AddShow(AbstractHandler):
     def handle(self, data: dict) -> dict | None:
-        data['price'] = int(data['price'])
+        data["price"] = int(data["price"])
         show = Showtime.create_new(**data)
+        movie = data["movie"]
+        movie.update({Movie.screening_number: movie.screening_number + 1})
+        movie.screening_number += 1
+        data["movie"] = movie.info()
         data["show"] = show.info()
         if self._next_handler:
             return super().handle(data)

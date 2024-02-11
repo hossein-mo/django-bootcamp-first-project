@@ -174,12 +174,17 @@ class AccountManagement:
             data["dest"] = "withdraw"
             data["transfer_type"] = "withdraw"
             response = AccountManagement.account_transfer(user, data)
-        elif request["subtype"] == "transfer":
-            data["origin"] = user.accounts[int(data["from_id"])]
-            data["dest"] = user.accounts[int(data["to_id"])]
+        elif request["subtype"] in {"transfer","userbalance"}:
+            if request["subtype"] == "transfer":
+                data["origin"] = user.accounts[int(data["from_id"])]
+                data["dest"] = user.accounts[int(data["to_id"])]
+                data["transfer_type"] = request["subtype"]
+            else:
+                data["origin"] = user.accounts[int(data["account_id"])]
+                data["dest"] = user
+                data["transfer_type"] = request["subtype"]
             data["password"] = str(data["password"])
             data["cvv2"] = str(data["cvv2"])
-            data["transfer_type"] = "transfer"
             response = AccountManagement.account_transfer(user, data)
         else:
             raise KeyError
@@ -228,6 +233,15 @@ class AccountManagement:
                     f"Your {data['transfer_type']} of {data['amount']} from {data['origin'].card_number} "
                     + f"to {data['dest'].card_number} was successful"
                 )
+            elif data["transfer_type"] == "userbalance":
+                log_message = (
+                    f"User adds fund to wallet, amount: {data['amount']} from card number: "
+                    + f"{data['origin'].card_number}, card id: {data['dest'].id}. "
+                    + f"username: {user.username}, user id: {user.id}, user balance: {user.balance} ."
+                )
+                res_message = (
+                    f"{data['amount']} added to your balance."
+                )
             else:
                 log_message = (
                     f"User {data['transfer_type']}, amount: {data['amount']} card number: "
@@ -250,22 +264,6 @@ class AccountManagement:
             "account",
             message=res_message,
         )
-
-    # @staticmethod
-    # def money_transfer(user: User, request: dict) -> dict:
-    #     data = request['data']
-    #     data['user'] = user
-    #     data['amount'] = int(data['amount'])
-    #     if request['subtype'] == 'deposit':
-    #         data['origin'] = 'deposit'
-    #         if data['dest'] == 'userbalance':
-    #             data['dest'] = user
-    #         else:
-    #             data['dest'] = int(data['dest'])
-    #     elif request['subtype'] == 'withdrawal':
-    #         data['dest'] == 'withdrawal'
-    #         data['origin'] = int(data['origin'])
-    #     elif request['subtype'] == 'transfer':
 
 
 class CinemaManagement:

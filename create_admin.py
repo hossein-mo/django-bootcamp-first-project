@@ -1,9 +1,24 @@
 import argparse
 import os
 import sys
+from pathlib import Path
 
-sys.path.append(os.path.dirname(__file__))
+from models.initialize import initialize
+from utils.utils import config_loader
+from utils.exceptions import DatabaseError
 from controllers.systems import UserManagement
+
+if __name__ == "__main__":
+    root_path = Path(__file__).parent
+    config_path = root_path.joinpath('config.ini')
+    config = config_loader(config_path)
+    try:
+        log = initialize.run_log_module(**config['logs'])
+        db = initialize.run_db_connection(config['database'])
+    except DatabaseError as err:
+        print(f"Problem connecting to database. Check your logs.")
+sys.path.append(os.path.dirname(__file__))
+
 
 parser = argparse.ArgumentParser(
     description="Create an admin user with the specified username, email, password, phone number and birth date",

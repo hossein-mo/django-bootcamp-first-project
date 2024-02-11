@@ -87,8 +87,7 @@ class User(BaseModel):
 
     def update_last_login(self) -> None:
         """Updated the last login time of the user in database to now"""
-        self.last_login = datetime.now()
-        self.update({User.last_login: self.last_login})
+        self.update({User.last_login: datetime.now()})
 
     @staticmethod
     def authenticate(usercred: Dict[str, str]) -> "User":
@@ -238,15 +237,6 @@ class BankAccount(BaseModel):
             "balance": self.balance,
         }
 
-    def update(self):
-        self.update(
-            {
-                BankAccount.card_number: self.card_number,
-                BankAccount.cvv2: self.cvv2,
-                BankAccount.password: self.password,
-            }
-        )
-
     @staticmethod
     def deposit(account: Union[User, "BankAccount"], amount: int) -> None:
         """Add amount to user's balance and update database.
@@ -255,15 +245,13 @@ class BankAccount(BaseModel):
             amount (int): amount to deposit
         """
         acc_cls = account.__class__
-        account.update({acc_cls.balance: account.balance + amount})
-        account.balance += amount
+        print(account.update({acc_cls.balance: account.balance + amount}))
         return True
 
     @staticmethod
     def withdraw(account: Union[User, "BankAccount"], amount: int) -> None:
         acc_cls = account.__class__
-        account.update({acc_cls.balance: account.balance - amount})
-        account.balance -= amount
+        print(account.update({acc_cls.balance: account.balance - amount}))
         return True
 
     @staticmethod
@@ -283,8 +271,6 @@ class BankAccount(BaseModel):
         query1 = origin.update_query({origin_cls.balance: origin.balance - amount})
         query2 = dest.update_query({dest_cls.balance: dest.balance + amount})
         origin_cls.db_obj.transaction([query1, query2])
-        origin.balance -= amount
-        dest.balance += amount
         return True
 
     @classmethod

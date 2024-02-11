@@ -87,12 +87,7 @@ class TCPServer:
                                 user, request["data"]
                             )
                     elif request["type"] == "account":
-                        if request["subtype"] == "add":
-                            response = AccountManagement.add_account_user(
-                                user, request["data"]
-                            )
-                        elif request["subtype"] == "list":
-                            response = AccountManagement.get_user_accounts(user)
+                        response = AccountManagement.process(user, request)
                     elif request["type"] == "management":
                         response = CinemaManagement.process(user, request)
                     elif request["type"] == "report":
@@ -106,6 +101,7 @@ class TCPServer:
                         "We had a problem processing your request. Please try again later.",
                     )
                 except (KeyError, TypeError, ValueError) as err:
+                    print(err)
                     response = create_response(False, "user", "Invalid request.")
                 TCPServer.socket_send(client_socket, response, size_length)
             TCPServer.loging.log_action(

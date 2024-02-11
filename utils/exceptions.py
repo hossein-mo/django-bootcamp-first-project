@@ -74,3 +74,8 @@ class ShowTimeError(Exception):
     def __init__(self, message: str = "Show overlaps with existing show!") -> None:
         self.message = message
         super().__init__(message)
+
+class UnvalidRate(Exception):
+    def __init__(self, message: str = "Rate must be in the range of 1 to 5 star!") -> None:
+        self.message = message
+        super().__init__(message)

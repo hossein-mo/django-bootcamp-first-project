@@ -6,6 +6,7 @@ sys.path.append(os.path.dirname(os.path.dirname(__file__)))
 import controllers.handlers.user_handlers as uHandlers
 import controllers.handlers.account_handlers as baHandlers
 import controllers.handlers.cinema_handlers as cHandlers
+import controllers.handlers.review_handlers as rHandlers
 import utils.exceptions as Excs
 import models.models as mod
 from loging.log import Log
@@ -78,30 +79,25 @@ class UserManagement:
 
     @staticmethod
     def process(user: mod.User, request: dict):
-        if request['subtype'] == 'info':
-            response = create_response(True, 'user', '', data=user.info())
+        if request["subtype"] == "info":
+            response = create_response(True, "user", "", data=user.info())
         elif request["subtype"] == "update":
-            response = UserManagement.edit_profile(
-                user, request["data"]
-            )
+            response = UserManagement.edit_profile(user, request["data"])
         elif request["subtype"] == "changepass":
-            response = UserManagement.change_password(
-                user, request["data"]
-            )
+            response = UserManagement.change_password(user, request["data"])
         elif request["subtype"] == "changerole":
-            response = UserManagement.change_user_role(
-                user, request["data"]
-            )
+            response = UserManagement.change_user_role(user, request["data"])
         return response
+
     @staticmethod
     def edit_profile(user: mod.User, data: dict):
         data["user"] = user
-        if 'username' not in data:
-            data['username'] = user.username
-        if 'email' not in data:
-            data['email'] = user.email
-        if 'phone_number' not in data:
-            data['phone_number'] = user.phone_number
+        if "username" not in data:
+            data["username"] = user.username
+        if "email" not in data:
+            data["email"] = user.email
+        if "phone_number" not in data:
+            data["phone_number"] = user.phone_number
         username = user.username
         useremail = user.email
         userphone = user.phone_number
@@ -170,7 +166,7 @@ class UserManagement:
             res_status = False
         response = create_response(res_status, "user", res_message)
         return response
-    
+
 
 class AccountManagement:
     loging: Log
@@ -196,7 +192,7 @@ class AccountManagement:
             data["dest"] = "withdraw"
             data["transfer_type"] = "withdraw"
             response = AccountManagement.account_transfer(user, data)
-        elif request["subtype"] in {"transfer","userbalance"}:
+        elif request["subtype"] in {"transfer", "userbalance"}:
             if request["subtype"] == "transfer":
                 data["origin"] = user.accounts[int(data["from_id"])]
                 data["dest"] = user.accounts[int(data["to_id"])]
@@ -261,9 +257,7 @@ class AccountManagement:
                     + f"{data['origin'].card_number}, card id: {data['dest'].id}. "
                     + f"username: {user.username}, user id: {user.id}, user balance: {user.balance} ."
                 )
-                res_message = (
-                    f"{data['amount']} added to your balance."
-                )
+                res_message = f"{data['amount']} added to your balance."
             else:
                 log_message = (
                     f"User {data['transfer_type']}, amount: {data['amount']} card number: "
@@ -275,8 +269,7 @@ class AccountManagement:
             status = True
         except (Excs.WrongBankAccCreds, Excs.NotEnoughBalance) as err:
             log_message = (
-                f"Failed transfer of money reason: {err.message}, info: "
-                + log_message
+                f"Failed transfer of money reason: {err.message}, info: " + log_message
             )
             res_message = err.message
             status = False
@@ -296,9 +289,9 @@ class CinemaManagement:
         data = request["data"]
         if request["subtype"] == "addmovie":
             response = CinemaManagement.add_movie(user, data)
-        if request["subtype"] == "addtheater":
+        elif request["subtype"] == "addtheater":
             response = CinemaManagement.add_theater(user, data)
-        if request["subtype"] == "addshow":
+        elif request["subtype"] == "addshow":
             response = CinemaManagement.add_show(user, data)
         else:
             raise KeyError
@@ -370,10 +363,12 @@ class Reports:
         data = request["data"]
         if request["subtype"] == "theaterlist":
             response = Reports.get_theaters(user)
-        if request["subtype"] == "movielist":
+        elif request["subtype"] == "movielist":
             response = Reports.get_movies(user)
-        if request["subtype"] == "showlist":
+        elif request["subtype"] == "showlist":
             response = Reports.get_shows(user)
+        elif request["subtype"] == "getcomments":
+            response = Reports.get_commetns(user, data)
         else:
             raise Excs.InvalidRequest
         return response
@@ -396,3 +391,51 @@ class Reports:
         data = mod.Showtime.get_shows_list()
         response = create_response(True, "report", "List of shows!", data=data)
         return response
+    
+    @staticmethod
+    def get_commetns(user: mod.User, data: dict):
+        comms = mod.Comment.get_comments(data['movie_id'])
+        response = create_response(True, "report", "List of shows!", data={'commetns': comms})
+        return response
+
+
+class Review:
+    loging: Log
+
+    @staticmethod
+    def process(user: mod.User, request: dict):
+        data = request["data"]
+        if request["subtype"] == "movierate":
+            response = Review.submmit_movie_rate(user, data)
+        elif request["subtype"] == "theaterrate":
+            response = Review.submmit_theater_rate(user, data)
+        else:
+            raise Excs.InvalidRequest
+        return response
+
+    @staticmethod
+    def submmit_movie_rate(user: mod.User, data: dict):
+        data["user"] = user
+        handler = rHandlers.SubmitMovieRate()
+        try:
+            handler.handle(data)
+            Review.loging.log_action(
+                f"Review submited. username: {user.username}, "
+                + f"user id {user.id}, movie id: {data['movie_id']}, rate: {data['rate']}"
+            )
+        except Excs.UnvalidRate as err:
+            return create_response(False, "review", err.message)
+        return create_response(True, "review", "Movie rate submited.")
+
+    def submmit_theater_rate(user: mod.User, data: dict):
+        data["user"] = user
+        handler = rHandlers.SubmitTheaterRate()
+        try:
+            handler.handle(data)
+            Review.loging.log_action(
+                f"Review submited. username: {user.username}, "
+                + f"user id {user.id}, theater id: {data['theater_id']}, rate: {data['rate']}"
+            )
+        except Excs.UnvalidRate as err:
+            return create_response(False, "review", err.message)
+        return create_response(True, "review", "Theater review submited.")

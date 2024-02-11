@@ -9,7 +9,7 @@ sys.path.append(os.path.dirname(os.path.dirname(__file__)))
 
 from utils.utils import create_response
 from utils.exceptions import DatabaseError
-from controllers.systems import UserManagement, AccountManagement
+from controllers.systems import UserManagement, AccountManagement, CinemaManagement
 from loging.log import Log
 
 
@@ -49,6 +49,7 @@ class TCPServer:
 
     @staticmethod
     def client_handler(client_socket: socket.socket, size_length: int):
+        user = None
         request = TCPServer.socket_recive(client_socket, size_length)
         try:
             response, user = UserManagement.client_authenticatation(request)
@@ -87,6 +88,10 @@ class TCPServer:
                             )
                         elif request["subtype"] == "list":
                             response = AccountManagement.get_user_accounts(user)
+                    elif request["type"] == "management":
+                        response = CinemaManagement.process(user, request)
+                    else:
+                        response = create_response(False, "user", "Invalid request.")
                 except DatabaseError as err:
                     response = create_response(
                         False,

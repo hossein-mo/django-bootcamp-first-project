@@ -92,9 +92,14 @@ class BaseModel:
     db_obj: DatabaseConnection
     loging: Log
 
+    def info(self) -> dict:
+        return self.__dict__
+
     @classmethod
     def create_new(cls, **kwargs):
-        return cls(**kwargs)
+        new = cls(**kwargs)
+        new.insert()
+        return new
 
     @classmethod
     def get_columns(cls) -> List[Column]:

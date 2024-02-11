@@ -77,8 +77,31 @@ class UserManagement:
         return response, user
 
     @staticmethod
+    def process(user: mod.User, request: dict):
+        if request['subtype'] == 'info':
+            response = create_response(True, 'user', '', data=user.info())
+        elif request["subtype"] == "update":
+            response = UserManagement.edit_profile(
+                user, request["data"]
+            )
+        elif request["subtype"] == "changepass":
+            response = UserManagement.change_password(
+                user, request["data"]
+            )
+        elif request["subtype"] == "changerole":
+            response = UserManagement.change_user_role(
+                user, request["data"]
+            )
+        return response
+    @staticmethod
     def edit_profile(user: mod.User, data: dict):
         data["user"] = user
+        if 'username' not in data:
+            data['username'] = user.username
+        if 'email' not in data:
+            data['email'] = user.email
+        if 'phone_number' not in data:
+            data['phone_number'] = user.phone_number
         username = user.username
         useremail = user.email
         userphone = user.phone_number
@@ -98,8 +121,7 @@ class UserManagement:
             response = create_response(False, "user", err.message)
         except Excs.DuplicatedEntry as err:
             response = create_response(False, "user", "Username or email are in use!")
-        finally:
-            return response, user
+        return response
 
     @staticmethod
     def change_password(user: mod.User, data: dict):
@@ -148,7 +170,7 @@ class UserManagement:
             res_status = False
         response = create_response(res_status, "user", res_message)
         return response
-
+    
 
 class AccountManagement:
     loging: Log

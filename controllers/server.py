@@ -74,18 +74,7 @@ class TCPServer:
                     if not request:
                         break
                     if request["type"] == "profile":
-                        if request["subtype"] == "update":
-                            response, user = UserManagement.edit_profile(
-                                user, request["data"]
-                            )
-                        elif request["subtype"] == "changepass":
-                            response = UserManagement.change_password(
-                                user, request["data"]
-                            )
-                        elif request["subtype"] == "changerole":
-                            response = UserManagement.change_user_role(
-                                user, request["data"]
-                            )
+                        response = UserManagement.process(user, request)
                     elif request["type"] == "account":
                         response = AccountManagement.process(user, request)
                     elif request["type"] == "management":

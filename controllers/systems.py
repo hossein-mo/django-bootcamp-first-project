@@ -211,14 +211,13 @@ class CinemaManagement:
         data = request["data"]
         if request["subtype"] == "addmovie":
             response = CinemaManagement.add_movie(user, data)
-        if request['subtype'] =="addtheater":
+        if request["subtype"] == "addtheater":
             response = CinemaManagement.add_theater(user, data)
-        if request['subtype'] == "theaterlist":
+        if request["subtype"] == "theaterlist":
             response = CinemaManagement.get_list_theaters(user)
         else:
             raise Excs.InvalidRequest
         return response
-
 
     @staticmethod
     @authorize(authorized_roles={UserRole.ADMIN, UserRole.STAFF})
@@ -227,13 +226,15 @@ class CinemaManagement:
         add_movie = cHandlers.AddMovie()
         handler.set_next(add_movie)
         data = handler.handle(data)
-        response = create_response(True, "management", "Movie added to the cinema archive.", data=data)
+        response = create_response(
+            True, "management", "Movie added to the cinema archive.", data=data
+        )
         CinemaManagement.loging.log_action(
             f"Movie add to the archive by {user.username}, user id: {user.id}. "
             + f"movie name: {data['m_name']} movie id: {data['id']}"
         )
         return response
-    
+
     @staticmethod
     @authorize(authorized_roles={UserRole.ADMIN})
     def add_theater(user: mod.User, data: dict) -> dict:
@@ -241,12 +242,15 @@ class CinemaManagement:
         add_theater = cHandlers.AddTheater()
         handler.set_next(add_theater)
         data = handler.handle(data)
-        response = create_response(True, "management", "Theater added to the cinema.", data=data)
+        response = create_response(
+            True, "management", "Theater added to the cinema.", data=data
+        )
         CinemaManagement.loging.log_action(
             f"Theater add to the cinema by {user.username}, user id: {user.id}. "
             + f"theater name: {data['t_name']} theater id: {data['id']}"
         )
         return response
+
 
 class Reports:
     # loging: Log
@@ -254,16 +258,23 @@ class Reports:
     @staticmethod
     def process(user: mod.User, request: dict):
         data = request["data"]
-        if request['subtype'] == "theaterlist":
-            response = Reports.get_list_theaters(user)
+        if request["subtype"] == "theaterlist":
+            response = Reports.get_theaters(user)
+        if request['subtype'] == 'movielist':
+            response = Reports.get_movies(user)
         else:
             raise Excs.InvalidRequest
         return response
-    
 
     @staticmethod
     @authorize(authorized_roles={UserRole.ADMIN, UserRole.STAFF})
-    def get_list_theaters(user: mod.User):
+    def get_theaters(user: mod.User):
         data = mod.Theater.get_theater_list()
-        response = create_response(True, 'management', "List of theaters!", data=data)
+        response = create_response(True, "report", "List of theaters!", data=data)
+        return response
+
+    @staticmethod
+    def get_movies(user: mod.User):
+        data = mod.Movie.get_movies_list()
+        response = create_response(True, "report", "List of movies!", data=data)
         return response

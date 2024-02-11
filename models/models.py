@@ -341,12 +341,12 @@ class Movie(BaseModel):
 
     @classmethod
     def get_movies_list(cls) -> list["Movie"]:
-        query = f"SELECT {Movie.name}.*, {Movie.rate} from {Movie.name} m \
+        query = f"SELECT {Movie.name}.*, {MovieRate.rate} from {Movie.name} \
                   LEFT JOIN (SELECT {MovieRate.movie_id.name}, \
-                  SUM({MovieRate.rate.name})/COUNT({MovieRate.rate.name}) as {Movie.rate} from {MovieRate.name} \
-                  GROUP BY {MovieRate.movie_id.name}) rt ON m.{Movie.id.name}=rt.{MovieRate.movie_id.name})"
+                  SUM({MovieRate.rate.name})/COUNT({MovieRate.rate.name}) as {MovieRate.rate} from {MovieRate.name} \
+                  GROUP BY {MovieRate.movie_id.name}) rt ON {Movie.name}.{Movie.id.name}=rt.{MovieRate.movie_id.name}"
         results = cls.db_obj.fetch(query)
-        return [cls(**item) for item in results]
+        return results
 
 
 class MovieRate(BaseModel):

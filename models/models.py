@@ -485,17 +485,13 @@ class Theater(BaseModel):
     capacity = Column("capacity", "INT UNSIGNED")
 
     def __init__(
-        self,
-        t_name: str,
-        capacity: int,
-        id: Union[int, None] = None,
-        rate: int=0
+        self, t_name: str, capacity: int, id: Union[int, None] = None, rate: int = 0
     ) -> None:
         self.id = id
         self.t_name = t_name
         self.capacity = capacity
         self.rate = rate
-    
+
     @classmethod
     def get_theater_list(cls) -> list[dict]:
         query = f"SELECT {Theater.name}.*, {TheaterRate.rate} from {Theater.name} \
@@ -504,6 +500,7 @@ class Theater(BaseModel):
                   GROUP BY {TheaterRate.theater_id}) rt ON {Theater.name}.{Theater.id}= rt.{TheaterRate.theater_id}"
         results = cls.db_obj.fetch(query)
         return results
+
 
 class TheaterRate(BaseModel):
     name = "theater_rate"
@@ -627,14 +624,18 @@ class Showtime(BaseModel):
         sub_query = f"SELECT m.*, rate from {Movie.name} m \
                         LEFT JOIN (SELECT {MovieRate.movie_id.name}, \
                         SUM({MovieRate.rate.name})/COUNT({MovieRate.rate.name}) as {rate} from {MovieRate.name} \
-                        GROUP BY {MovieRate.movie_id.name}) rt ON m.{Movie.id.name}=rt.{MovieRate.movie_id.name})"
+                        GROUP BY {MovieRate.movie_id.name}) rt ON m.{Movie.id.name}=rt.{MovieRate.movie_id.name}"
+        sub_query2 = f"SELECT {Theater.name}.*, {Theater.name}_{TheaterRate.rate} from {Theater.name} \
+                  LEFT JOIN (SELECT {TheaterRate.theater_id}, \
+                  SUM({TheaterRate.rate})/COUNT({TheaterRate.rate}) as {Theater.name}_{TheaterRate.rate} from {TheaterRate.name} \
+                  GROUP BY {TheaterRate.theater_id}) rt ON {Theater.name}.{Theater.id}= rt.{TheaterRate.theater_id}"
         query = f"SELECT s.*, s.id as {showtime_id}, m.*, m.id as {movie_id}, th.*, th.id as {theater_id} \
                     FROM {Showtime.name} s \
-                    JOIN {sub_query} m ON s.{Showtime.movie_id.name} = m.{Movie.id.name} \
-                    JOIN {Theater.name} th ON s.{Showtime.theater_id.name} = th.{Theater.id.name} \
+                    JOIN ({sub_query}) m ON s.{Showtime.movie_id.name} = m.{Movie.id.name} \
+                    JOIN ({sub_query2}) th ON s.{Showtime.theater_id.name} = th.{Theater.id.name} \
                     WHERE s.{Showtime.start_date.name} > now()"
-        results = cls.db_obj.execute(query)
-        list = []
+        results = cls.db_obj.fetch(query)
+        result_list = []
         for item in results:
             show_obj = cls(
                 item[Showtime.movie_id.name],
@@ -650,12 +651,16 @@ class Showtime(BaseModel):
                 item[Movie.age_rating.name],
                 item[Movie.screening_number.name],
                 item[movie_id],
-            )
+                item[MovieRate.rate.name],
+            ).info()
             show_obj.theater = Theater(
-                item[Theater.t_name.name], item[Theater.capacity.name], item[theater_id]
-            )
-            list.append(show_obj)
-        return list
+                item[Theater.t_name.name],
+                item[Theater.capacity.name],
+                item[theater_id],
+                item[f"{Theater.name}_{TheaterRate.rate.name}"],
+            ).info()
+            result_list.append(show_obj.__dict__)
+        return result_list
 
 
 class Order(BaseModel):

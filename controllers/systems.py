@@ -287,6 +287,8 @@ class Reports:
             response = Reports.get_theaters(user)
         if request["subtype"] == "movielist":
             response = Reports.get_movies(user)
+        if request["subtype"] == "showlist":
+            response = Reports.get_shows(user)
         else:
             raise Excs.InvalidRequest
         return response
@@ -302,4 +304,10 @@ class Reports:
     def get_movies(user: mod.User):
         data = mod.Movie.get_movies_list()
         response = create_response(True, "report", "List of movies!", data=data)
+        return response
+    
+    @staticmethod
+    def get_shows(user: mod.User):
+        data = mod.Showtime.get_shows_list()
+        response = create_response(True, "report", "List of shows!", data=data)
         return response

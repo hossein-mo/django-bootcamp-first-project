@@ -109,7 +109,7 @@ class CheckShowTime(AbstractHandler):
         if show_duration < movie_duration:
             raise ShowTimeError(
                 message=f"Show duration of {show_duration} minutes "
-                + f"greater than movie duration of {movie_duration} minutes"
+                + f"less than movie duration of {movie_duration} minutes"
             )
         data["start_date"] = start_date
         data["end_date"] = end_date

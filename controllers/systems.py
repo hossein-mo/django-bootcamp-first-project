@@ -261,15 +261,20 @@ class CinemaManagement:
         try:
             handler.set_next(movie_check).set_next(time_check).set_next(add_show)
             data = handler.handle(data)
-            r_status = True
-            r_message = "Show has benn added!"
-            r_data = data["show"]
+            status = True
+            message = "Show has benn added!"
+            data = data["show"]
+            CinemaManagement.loging.log_action(
+                f"Show add to the cinema by {user.username}, user id: {user.id}. "
+                + f"theater id: {data['theater_id']} movie id: {data['movie_id']}"
+                + f" start date: {data['start_date']}, end date: {data['end_date']}"
+            )
         except (Excs.TheaterNotExist, Excs.MovieNotExist, Excs.ShowTimeError) as err:
-            r_status = False
-            r_message = err.message
-            r_data = {}
-        
-        return create_response(r_status, 'management', r_message, r_data)
+            status = False
+            message = err.message
+            data = {}
+
+        return create_response(status, "management", message, data)
 
 
 class Reports:

@@ -129,7 +129,7 @@ class ProfileInfoUpdate(AbstractHandler):
 
 class LoginHandler(AbstractHandler):
     def handle(self, data: dict) -> dict | None:
-        user = User.autenthicate(data)
+        user = User.authenticate(data)
         user.update_last_login()
         data["user"] = user
         if self._next_handler:

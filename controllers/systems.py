@@ -5,11 +5,12 @@ from typing import List
 sys.path.append(os.path.dirname(os.path.dirname(__file__)))
 import controllers.handlers.user_handlers as uHandlers
 import controllers.handlers.account_handlers as baHandlers
+import controllers.handlers.archive_handlers as aHandlers
 import utils.exceptions as Excs
+import models.models as mod
 from loging.log import Log
-from models.models import User, BankAccount
 from models.base_models import UserRole
-from controllers.autorization import authorize
+from controllers.authorization import authorize
 from utils.utils import create_response
 
 
@@ -39,7 +40,7 @@ class UserManagement:
         return user
 
     @staticmethod
-    def authenticate(request: dict) -> User | None:
+    def authenticate(request: dict) -> mod.User | None:
         data = request["data"]
         if request["type"] == "login":
             user = UserManagement.login(data)
@@ -52,7 +53,6 @@ class UserManagement:
     @staticmethod
     def client_authenticatation(request, role: UserRole = UserRole.USER):
         user = None
-
         if request["type"] == "signup":
             request["data"]["role"] = role
         try:
@@ -74,11 +74,10 @@ class UserManagement:
             response = create_response(
                 False, "user", "User authentication faild. Please login."
             )
-        finally:
-            return response, user
+        return response, user
 
     @staticmethod
-    def edit_profile(user: User, data: dict):
+    def edit_profile(user: mod.User, data: dict):
         data["user"] = user
         username = user.username
         useremail = user.email
@@ -92,8 +91,8 @@ class UserManagement:
             handler.handle(data)
             response = create_response(True, "user", "Profile updated.", user.info())
             UserManagement.loging.log_action(
-                    f"User changed its user info. username: {username} -> {user.username}" +\
-                    f"email: {useremail} -> {user.email}, {userphone} -> {user.phone_number}"
+                f"User changed its user info. username: {username} -> {user.username}"
+                + f"email: {useremail} -> {user.email}, {userphone} -> {user.phone_number}"
             )
         except Excs.InvalidUserInfo as err:
             response = create_response(False, "user", err.message)
@@ -103,7 +102,7 @@ class UserManagement:
             return response, user
 
     @staticmethod
-    def change_password(user: User, data: dict):
+    def change_password(user: mod.User, data: dict):
         handler = uHandlers.PasswordPolicyVerification()
         change_password = uHandlers.ChangePassword()
         handler.set_next(change_password)
@@ -133,7 +132,7 @@ class UserManagement:
 
     @staticmethod
     @authorize(authorized_roles={UserRole.ADMIN})
-    def change_user_role(user: User, data: dict):
+    def change_user_role(user: mod.User, data: dict):
         change_role = uHandlers.ChangeUserRole()
         try:
             data = change_role.handle(data)
@@ -141,8 +140,8 @@ class UserManagement:
             res_status = True
             affected = data["affected"]
             UserManagement.loging.log_action(
-                f"user with username {affected.username} role changed to {affected.role} "+\
-                f"by admin with username {user.username} and id {user.id}"
+                f"user with username {affected.username} role changed to {affected.role} "
+                + f"by admin with username {user.username} and id {user.id}"
             )
         except Excs.InvalidUserInfo as err:
             res_message = err.message
@@ -155,7 +154,7 @@ class AccountManagement:
     loging: Log
 
     @staticmethod
-    def add_account_user(user: User, data: dict) -> dict:
+    def add_account_user(user: mod.User, data: dict) -> dict:
         data = {"user": user, "card_info": data}
         account = baHandlers.AddAccount()
         try:
@@ -173,14 +172,58 @@ class AccountManagement:
             return create_response(False, "account", err.message)
 
     @staticmethod
-    def get_user_accounts(user) -> List[BankAccount]:
-        user_accs = BankAccount.fetch_obj(where=f"{BankAccount.user_id} = {user.id}")
+    def get_user_accounts(user) -> List[mod.BankAccount]:
+        user_accs = mod.BankAccount.fetch_obj(
+            where=f"{mod.BankAccount.user_id} = {user.id}"
+        )
         return create_response(
             True, "account", "", data={"accounts": [acc.info() for acc in user_accs]}
         )
+
+    # @staticmethod
+    # def money_transfer(user: User, request: dict) -> dict:
+    #     data = request['data']
+    #     data['user'] = user
+    #     data['amount'] = int(data['amount'])
+    #     if request['subtype'] == 'deposit':
+    #         data['origin'] = 'deposit'
+    #         if data['dest'] == 'userbalance':
+    #             data['dest'] = user
+    #         else:
+    #             data['dest'] = int(data['dest'])
+    #     elif request['subtype'] == 'withdrawal':
+    #         data['dest'] == 'withdrawal'
+    #         data['origin'] = int(data['origin'])
+    #     elif request['subtype'] == 'transfer':
 
     # @staticmethod
     # def wallet_deposit(user: User, account_id: int) -> None:
     #     account = BankAccount.fetch_obj(
     #         where=f'{BankAccount.id} = "{account_id}" AND {BankAccount.user_id} = "{user.id}"'
     #     )
+
+
+class ArchiveManagement:
+    loging: Log
+
+    @staticmethod
+    def process(user: mod.User, request: dict):
+        data = request["data"]
+        if request["subtype"] == "addmovie":
+            response = ArchiveManagement.add_movie(user, data)
+        return response
+
+
+    @staticmethod
+    @authorize(authorized_roles={UserRole.ADMIN, UserRole.STAFF})
+    def add_movie(user: mod.User, data: dict) -> dict:
+        handler = aHandlers.CheckMovieInfo()
+        add_movie = aHandlers.AddMovie()
+        handler.set_next(add_movie)
+        data = handler.handle(data)
+        response = create_response(True, "archive", "Movie added to the cinema archive.", data=data)
+        ArchiveManagement.loging.log_action(
+            f"Movie add to the archive by {user.username}, user id: {user.id}. "
+            + f"movie name: {data['m_name']} movie id: {data['id']}"
+        )
+        return response

@@ -11,7 +11,7 @@ def authorize(authorized_roles: set):
             if user.role in authorized_roles:
                 return func(*args, **kwargs)
             else:
-                return create_response(False, "user", 'User not authorized for the action.')
+                return create_response(False, "user", 'User not authorized for this action.')
 
         return wrapper
 

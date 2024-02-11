@@ -275,7 +275,9 @@ class BankAccount(BaseModel):
         password = hash_password(password)
         account = cls(card_number, cvv2, password, balance, user_id)
         account.insert()
-        User.loging.log_action(f"New bank account added. card_number: {account.card_number}, user_id: {account.user_id}")
+        User.loging.log_action(
+            f"New bank account added. card_number: {account.card_number}, user_id: {account.user_id}"
+        )
         return account
 
 
@@ -316,42 +318,26 @@ class Subscription(BaseModel):
 class Movie(BaseModel):
     name = "movie"
     id = Column("id", "INT UNSIGNED", primary_key=True, auto_increment=True)
-    m_name = Column("name", "VARCHAR(255)")
-    duration = Column("duration", "TIME")
+    m_name = Column("m_name", "VARCHAR(255)")
+    duration = Column("duration", "SMALLINT UNSIGNED")
     age_rating = Column("age_rating", "SMALLINT UNSIGNED")
     screening_number = Column("screening_number", "SMALLINT UNSIGNED")
 
     def __init__(
         self,
-        name: str,
+        m_name: str,
         duration: int,
         age_rating: int,
-        screening_number: int,
+        screening_number: int = 0,
         id: Union[int, None] = None,
         rate=0,
     ) -> None:
         self.id = id
-        self.name = name
+        self.m_name = m_name
         self.duration = duration
         self.age_rating = age_rating
         self.screening_number = screening_number
         self.rate = rate
-
-    def add_movie(self):
-        self.insert()
-
-    def update_movie(self):
-        self.update(
-            {
-                Movie.m_name: self.name,
-                Movie.duration: self.duration,
-                Movie.age_rating: self.age_rating,
-                Movie.screening_number: self.screening_number,
-            }
-        )
-
-    def delete_movie(self):
-        self.delete()
 
     @classmethod
     def get_movies_list(cls) -> list["Movie"]:

@@ -154,6 +154,38 @@ class AccountManagement:
     loging: Log
 
     @staticmethod
+    def process(user: mod.User, request: dict):
+        data = request["data"]
+        if request["subtype"] == "add":
+            response = AccountManagement.add_account_user(user, data)
+        elif request["subtype"] == "list":
+            response = AccountManagement.get_user_accounts(user)
+        elif request["subtype"] == "deposit":
+            data["dest"] = user.accounts[int(data["account_id"])]
+            data["card"] = data["dest"]
+            data["origin"] = "deposit"
+            data["transfer_type"] = "deposit"
+            response = AccountManagement.account_transfer(user, data)
+        elif request["subtype"] == "withdraw":
+            data["origin"] = user.accounts[int(data["account_id"])]
+            data["card"] = data["origin"]
+            data["password"] = str(data["password"])
+            data["cvv2"] = str(data["cvv2"])
+            data["dest"] = "withdraw"
+            data["transfer_type"] = "withdraw"
+            response = AccountManagement.account_transfer(user, data)
+        elif request["subtype"] == "transfer":
+            data["origin"] = user.accounts[int(data["from_id"])]
+            data["dest"] = user.accounts[int(data["to_id"])]
+            data["password"] = str(data["password"])
+            data["cvv2"] = str(data["cvv2"])
+            data["transfer_type"] = "transfer"
+            response = AccountManagement.account_transfer(user, data)
+        else:
+            raise KeyError
+        return response
+
+    @staticmethod
     def add_account_user(user: mod.User, data: dict) -> dict:
         data = {"user": user, "card_info": data}
         account = baHandlers.AddAccount()
@@ -162,6 +194,7 @@ class AccountManagement:
             AccountManagement.loging.log_action(
                 f"New bank account added for user. username: {user.username}, id: {user.id}"
             )
+            print(user.accounts)
             return create_response(
                 True,
                 "account",
@@ -173,11 +206,49 @@ class AccountManagement:
 
     @staticmethod
     def get_user_accounts(user) -> List[mod.BankAccount]:
-        user_accs = mod.BankAccount.fetch_obj(
-            where=f"{mod.BankAccount.user_id} = {user.id}"
-        )
         return create_response(
-            True, "account", "", data={"accounts": [acc.info() for acc in user_accs]}
+            True, "account", "", data=[acc.info() for acc in user.accounts.values()]
+        )
+
+    @staticmethod
+    def account_transfer(user: mod.User, data: dict) -> None:
+        handler = baHandlers.AccountCredentialsCheck()
+        balance_check = baHandlers.BalanceCheck()
+        transf = baHandlers.TransferHandler()
+        try:
+            handler.set_next(balance_check).set_next(transf)
+            if data["transfer_type"] == "transfer":
+                log_message = (
+                    f"User {data['transfer_type']}, amount: {data['amount']} from card number: "
+                    + f"{data['origin'].card_number}, card id: {data['dest'].id}. to card number: "
+                    + f"{data['dest'].card_number}, card id: {data['dest'].id}. "
+                    + f"username: {user.username}, user id: {user.id}"
+                )
+                res_message = (
+                    f"Your {data['transfer_type']} of {data['amount']} from {data['origin'].card_number} "
+                    + f"to {data['dest'].card_number} was successful"
+                )
+            else:
+                log_message = (
+                    f"User {data['transfer_type']}, amount: {data['amount']} card number: "
+                    + f"{data['card'].card_number}, card id: {data['card'].id}. "
+                    + f"username: {user.username}, user id: {user.id}"
+                )
+                res_message = f"Your {data['transfer_type']} of {data['amount']} was successful. Affected card number {data['card'].card_number} "
+            data = handler.handle(data)
+            status = True
+        except (Excs.WrongBankAccCreds, Excs.NotEnoughBalance) as err:
+            log_message = (
+                f"Failed transfer of money reason: {err.message}, info: "
+                + log_message
+            )
+            res_message = err.message
+            status = False
+        AccountManagement.loging.log_transaction(log_message)
+        return create_response(
+            status,
+            "account",
+            message=res_message,
         )
 
     # @staticmethod
@@ -195,12 +266,6 @@ class AccountManagement:
     #         data['dest'] == 'withdrawal'
     #         data['origin'] = int(data['origin'])
     #     elif request['subtype'] == 'transfer':
-
-    # @staticmethod
-    # def wallet_deposit(user: User, account_id: int) -> None:
-    #     account = BankAccount.fetch_obj(
-    #         where=f'{BankAccount.id} = "{account_id}" AND {BankAccount.user_id} = "{user.id}"'
-    #     )
 
 
 class CinemaManagement:
@@ -305,7 +370,7 @@ class Reports:
         data = mod.Movie.get_movies_list()
         response = create_response(True, "report", "List of movies!", data=data)
         return response
-    
+
     @staticmethod
     def get_shows(user: mod.User):
         data = mod.Showtime.get_shows_list()

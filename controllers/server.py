@@ -87,12 +87,7 @@ class TCPServer:
                                 user, request["data"]
                             )
                     elif request["type"] == "account":
-                        if request["subtype"] == "add":
-                            response = AccountManagement.add_account_user(
-                                user, request["data"]
-                            )
-                        elif request["subtype"] == "list":
-                            response = AccountManagement.get_user_accounts(user)
+                        response = AccountManagement.process(user, request)
                     elif request["type"] == "management":
                         response = CinemaManagement.process(user, request)
                     elif request["type"] == "report":

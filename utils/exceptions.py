@@ -38,8 +38,9 @@ class AuthenticationFaild(Exception):
 
 class NotEnoughBalance(Exception):
 
-    def __init__(self) -> None:
+    def __init__(self, message: str = "Not enough balance.") -> None:
         """Exception to raise when balance is not enough"""
+        self.message = message
         super().__init__("Not enough balance.")
 
 

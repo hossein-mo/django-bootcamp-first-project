@@ -39,6 +39,9 @@ class User(BaseModel):
         register_date: datetime,
         last_login: datetime,
         id: Union[int, None] = None,
+        accounts: Union[list, None] = None,
+        subs: Union["Subscription", None] = None,
+        sub_exp: Union[int, str] = None,
     ) -> None:
         """Constructor for user model
 
@@ -64,6 +67,9 @@ class User(BaseModel):
         self.last_login = last_login
         self.phone_number = phone_number
         self.balance = balance
+        self.accounts = accounts
+        self.subs = subs
+        self.sub_exp = sub_exp
 
     def info(self) -> dict:
         return {
@@ -73,17 +79,18 @@ class User(BaseModel):
             "birth_date": self.birth_date,
             "last_login": self.last_login,
             "register_date": self.register_date,
+            "subs": self.subs.s_name,
+            "subs_expires_in": self.sub_exp,
             "balance": self.balance,
             "role": self.role.value,
         }
 
     def update_last_login(self) -> None:
         """Updated the last login time of the user in database to now"""
-        self.last_login = datetime.now()
-        self.update({User.last_login: self.last_login})
+        self.update({User.last_login: datetime.now()})
 
     @staticmethod
-    def autenthicate(usercred: Dict[str, str]) -> "User":
+    def authenticate(usercred: Dict[str, str]) -> "User":
         """_summary_
 
         Args:
@@ -95,7 +102,7 @@ class User(BaseModel):
             WrongCredentials: if input password doesn't match the user password
 
         Returns:
-            User: autenthicated user
+            User: authenticate user
         """
         password = hash_password(usercred["password"])
         if "username" in usercred:
@@ -119,6 +126,25 @@ class User(BaseModel):
             User.loging.log_action(
                 f"User logged in with user id = {user.id} username = {user.username} and email = {user.email}"
             )
+            accounts = BankAccount.fetch_obj(where=f"{BankAccount.user_id}={user.id}")
+            user.accounts = {}
+            if accounts:
+                for acc in accounts:
+                    user.accounts[acc.id] = acc
+            user_sub = UserSubscription.fetch_obj(
+                where=f"{UserSubscription.user_id}={user.id} AND {UserSubscription.expire_date} > NOW()"
+            )
+            if user_sub:
+                user_sub = user_sub[0]
+                subs = Subscription.fetch_obj(
+                    where=f"{Subscription.id} = {user_sub.subscription_id}"
+                )
+                sub_exp = (user_sub.expire_date - datetime.now()).days
+            else:
+                sub_exp = "unlimited"
+                subs = Subscription("Bronze", 0, duration="unlimited")
+            user.subs = subs[0]
+            user.sub_exp = sub_exp
             return user
 
     @classmethod
@@ -147,6 +173,8 @@ class User(BaseModel):
         """
         password = hash_password(password)
         rightnow = datetime.now()
+        sub_exp = "unlimited"
+        subs = Subscription("Bronze", 0, duration=sub_exp)
         user = cls(
             username,
             password,
@@ -157,6 +185,8 @@ class User(BaseModel):
             birth_date,
             rightnow,
             rightnow,
+            subs=subs,
+            sub_exp=sub_exp,
         )
         user.insert()
         User.loging.log_action(f"New user registerd. userinfo: {user.info()}")
@@ -207,15 +237,6 @@ class BankAccount(BaseModel):
             "balance": self.balance,
         }
 
-    def update(self):
-        self.update(
-            {
-                BankAccount.card_number: self.card_number,
-                BankAccount.cvv2: self.cvv2,
-                BankAccount.password: self.password,
-            }
-        )
-
     @staticmethod
     def deposit(account: Union[User, "BankAccount"], amount: int) -> None:
         """Add amount to user's balance and update database.
@@ -224,15 +245,13 @@ class BankAccount(BaseModel):
             amount (int): amount to deposit
         """
         acc_cls = account.__class__
-        account.update({acc_cls.balance: account.balance + amount})
-        account.balance += amount
+        print(account.update({acc_cls.balance: account.balance + amount}))
         return True
 
     @staticmethod
     def withdraw(account: Union[User, "BankAccount"], amount: int) -> None:
         acc_cls = account.__class__
-        account.update({acc_cls.balance: account.balance - amount})
-        account.balance -= amount
+        print(account.update({acc_cls.balance: account.balance - amount}))
         return True
 
     @staticmethod
@@ -252,8 +271,6 @@ class BankAccount(BaseModel):
         query1 = origin.update_query({origin_cls.balance: origin.balance - amount})
         query2 = dest.update_query({dest_cls.balance: dest.balance + amount})
         origin_cls.db_obj.transaction([query1, query2])
-        origin.balance -= amount
-        dest.balance += amount
         return True
 
     @classmethod
@@ -284,16 +301,21 @@ class BankAccount(BaseModel):
 class Subscription(BaseModel):
     name = "subscription"
     id = Column("id", "INT UNSIGNED", primary_key=True, auto_increment=True)
-    s_name = Column("name", "VARCHAR(255)")
+    s_name = Column("s_name", "VARCHAR(255)")
     discount = Column("discount", "SMALLINT UNSIGNED")
     duration = Column("duration", "SMALLINT UNSIGNED")
     order_number = Column("order_number", "VARCHAR(255)", null=True)
 
     def __init__(
-        self, name, discount, duration=30, order_number=0, id: Union[int, None] = None
+        self,
+        s_name: str,
+        discount: int,
+        duration=30,
+        order_number=0,
+        id: Union[int, None] = None,
     ):
         self.id = id
-        self.name = name
+        self.s_name = s_name
         self.discount = discount
         self.duration = duration
         self.order_number = order_number
@@ -304,7 +326,7 @@ class Subscription(BaseModel):
     def update_subscription(self):
         self.update(
             {
-                Subscription.s_name: self.name,
+                Subscription.s_name: self.s_name,
                 Subscription.discount: self.discount,
                 Subscription.duration: self.duration,
                 Subscription.order_number: self.order_number,
@@ -443,6 +465,20 @@ class UserSubscription(BaseModel):
     )
     buy_date = Column("buy_date", "DATETIME")
     expire_date = Column("expire_date", "DATETIME")
+
+    def __init__(
+        self,
+        user_id: int,
+        subscription_id: int,
+        buy_date: datetime,
+        expire_date: datetime,
+        id: int = None,
+    ) -> None:
+        self.id = id
+        self.user_id = user_id
+        self.subscription_id = subscription_id
+        self.buy_date = buy_date
+        self.expire_date = expire_date
 
     @staticmethod
     def set_user_subscription(user, subscription):

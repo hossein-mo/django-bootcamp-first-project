@@ -213,6 +213,10 @@ class CinemaManagement:
             response = CinemaManagement.add_movie(user, data)
         if request['subtype'] =="addtheater":
             response = CinemaManagement.add_theater(user, data)
+        if request['subtype'] == "theaterlist":
+            response = CinemaManagement.get_list_theaters(user)
+        else:
+            raise Excs.InvalidRequest
         return response
 
 
@@ -223,7 +227,7 @@ class CinemaManagement:
         add_movie = cHandlers.AddMovie()
         handler.set_next(add_movie)
         data = handler.handle(data)
-        response = create_response(True, "cinema", "Movie added to the cinema archive.", data=data)
+        response = create_response(True, "management", "Movie added to the cinema archive.", data=data)
         CinemaManagement.loging.log_action(
             f"Movie add to the archive by {user.username}, user id: {user.id}. "
             + f"movie name: {data['m_name']} movie id: {data['id']}"
@@ -237,9 +241,16 @@ class CinemaManagement:
         add_theater = cHandlers.AddTheater()
         handler.set_next(add_theater)
         data = handler.handle(data)
-        response = create_response(True, "archive", "Theater added to the cinema.", data=data)
+        response = create_response(True, "management", "Theater added to the cinema.", data=data)
         CinemaManagement.loging.log_action(
             f"Theater add to the cinema by {user.username}, user id: {user.id}. "
             + f"theater name: {data['t_name']} theater id: {data['id']}"
         )
+        return response
+
+    @staticmethod
+    @authorize(authorized_roles={UserRole.ADMIN, UserRole.STAFF})
+    def get_list_theaters(user: mod.User):
+        data = mod.Theater.get_theater_list()
+        response = create_response(True, 'management', "List of theaters!", data=data)
         return response

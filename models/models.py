@@ -489,11 +489,21 @@ class Theater(BaseModel):
         t_name: str,
         capacity: int,
         id: Union[int, None] = None,
+        rate: int=0
     ) -> None:
         self.id = id
         self.t_name = t_name
         self.capacity = capacity
-
+        self.rate = rate
+    
+    @classmethod
+    def get_theater_list(cls) -> list[dict]:
+        query = f"SELECT {Theater.name}.*, {TheaterRate.rate} from {Theater.name} \
+                  LEFT JOIN (SELECT {TheaterRate.theater_id}, \
+                  SUM({TheaterRate.rate})/COUNT({TheaterRate.rate}) as {TheaterRate.rate} from {TheaterRate.name} \
+                  GROUP BY {TheaterRate.theater_id}) rt ON {Theater.name}.{Theater.id}= rt.{TheaterRate.theater_id}"
+        results = cls.db_obj.fetch(query)
+        return results
 
 class TheaterRate(BaseModel):
     name = "theater_rate"

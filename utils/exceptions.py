@@ -42,7 +42,7 @@ class NotEnoughBalance(Exception):
 
 
 class InvalidRequest(Exception):
-    def __init__(self, message: str = "Invalid request please try again!") -> None:
+    def __init__(self, message: str = "Invalid request!") -> None:
         self.message = message
         super().__init__(self.message)
 

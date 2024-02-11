@@ -574,6 +574,16 @@ class Showtime(BaseModel):
         self.movie = movie
         self.theater = theater
 
+    def info(self) -> dict:
+        return {
+            "id": self.id,
+            "movie_id": self.movie_id,
+            "theater_id": self.theater_id,
+            "start_date": self.start_date,
+            "end_date": self.end_date,
+            "price": self.price,
+        }
+
     def update_showtime(self):
         self.update(
             {

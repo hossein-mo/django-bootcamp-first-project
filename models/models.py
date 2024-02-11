@@ -128,10 +128,13 @@ class User(BaseModel):
                 f"User logged in with user id = {user.id} username = {user.username} and email = {user.email}"
             )
             accounts = BankAccount.fetch_obj(where=f"{BankAccount.user_id}={user.id}")
+            user.accounts = {}
+            if accounts:
+                for acc in accounts:
+                    user.accounts[acc.id] = acc
             user_sub = UserSubscription.fetch_obj(
                 where=f"{UserSubscription.user_id}={user.id} AND {UserSubscription.expire_date} > NOW()"
             )
-            print("here")
             if user_sub:
                 user_sub = user_sub[0]
                 subs = Subscription.fetch_obj(
@@ -141,7 +144,6 @@ class User(BaseModel):
             else:
                 sub_exp = "unlimited"
                 subs = Subscription("Bronze", 0, duration="unlimited")
-            user.accounts = accounts
             user.subs = subs[0]
             user.sub_exp = sub_exp
             return user

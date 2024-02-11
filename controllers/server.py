@@ -106,7 +106,6 @@ class TCPServer:
                         "We had a problem processing your request. Please try again later.",
                     )
                 except (KeyError, TypeError, ValueError) as err:
-                    print(err)
                     response = create_response(False, "user", "Invalid request.")
                 TCPServer.socket_send(client_socket, response, size_length)
             TCPServer.loging.log_action(

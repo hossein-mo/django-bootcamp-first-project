@@ -203,14 +203,14 @@ class AccountManagement:
     #     )
 
 
-class ArchiveManagement:
+class CinemaManagement:
     loging: Log
 
     @staticmethod
     def process(user: mod.User, request: dict):
         data = request["data"]
         if request["subtype"] == "addmovie":
-            response = ArchiveManagement.add_movie(user, data)
+            response = CinemaManagement.add_movie(user, data)
         return response
 
 
@@ -222,7 +222,7 @@ class ArchiveManagement:
         handler.set_next(add_movie)
         data = handler.handle(data)
         response = create_response(True, "archive", "Movie added to the cinema archive.", data=data)
-        ArchiveManagement.loging.log_action(
+        CinemaManagement.loging.log_action(
             f"Movie add to the archive by {user.username}, user id: {user.id}. "
             + f"movie name: {data['m_name']} movie id: {data['id']}"
         )

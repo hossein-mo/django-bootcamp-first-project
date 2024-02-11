@@ -21,7 +21,7 @@ class initialize:
         TCPServer.loging = log
         systms.UserManagement.loging = log
         systms.AccountManagement.loging = log
-        systms.ArchiveManagement.loging = log
+        systms.CinemaManagement.loging = log
 
         return log
 

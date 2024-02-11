@@ -271,6 +271,8 @@ class BankAccount(BaseModel):
         query1 = origin.update_query({origin_cls.balance: origin.balance - amount})
         query2 = dest.update_query({dest_cls.balance: dest.balance + amount})
         origin_cls.db_obj.transaction([query1, query2])
+        origin.balance = origin.balance - amount
+        dest.balance = dest.balance + amount
         return True
 
     @classmethod

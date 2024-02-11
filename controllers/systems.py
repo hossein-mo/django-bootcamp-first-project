@@ -5,7 +5,7 @@ from typing import List
 sys.path.append(os.path.dirname(os.path.dirname(__file__)))
 import controllers.handlers.user_handlers as uHandlers
 import controllers.handlers.account_handlers as baHandlers
-import controllers.handlers.archive_handlers as aHandlers
+import controllers.handlers.cinema_handlers as cHandlers
 import utils.exceptions as Excs
 import models.models as mod
 from loging.log import Log
@@ -211,19 +211,35 @@ class CinemaManagement:
         data = request["data"]
         if request["subtype"] == "addmovie":
             response = CinemaManagement.add_movie(user, data)
+        if request['subtype'] =="addtheater":
+            response = CinemaManagement.add_theater(user, data)
         return response
 
 
     @staticmethod
     @authorize(authorized_roles={UserRole.ADMIN, UserRole.STAFF})
     def add_movie(user: mod.User, data: dict) -> dict:
-        handler = aHandlers.CheckMovieInfo()
-        add_movie = aHandlers.AddMovie()
+        handler = cHandlers.CheckMovieInfo()
+        add_movie = cHandlers.AddMovie()
         handler.set_next(add_movie)
         data = handler.handle(data)
-        response = create_response(True, "archive", "Movie added to the cinema archive.", data=data)
+        response = create_response(True, "cinema", "Movie added to the cinema archive.", data=data)
         CinemaManagement.loging.log_action(
             f"Movie add to the archive by {user.username}, user id: {user.id}. "
             + f"movie name: {data['m_name']} movie id: {data['id']}"
+        )
+        return response
+    
+    @staticmethod
+    @authorize(authorized_roles={UserRole.ADMIN})
+    def add_theater(user: mod.User, data: dict) -> dict:
+        handler = cHandlers.CheckTheaterInfo()
+        add_theater = cHandlers.AddTheater()
+        handler.set_next(add_theater)
+        data = handler.handle(data)
+        response = create_response(True, "archive", "Theater added to the cinema.", data=data)
+        CinemaManagement.loging.log_action(
+            f"Theater add to the cinema by {user.username}, user id: {user.id}. "
+            + f"theater name: {data['t_name']} theater id: {data['id']}"
         )
         return response

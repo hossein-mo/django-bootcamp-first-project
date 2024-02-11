@@ -481,18 +481,18 @@ class UserSubscription(BaseModel):
 class Theater(BaseModel):
     name = "theater"
     id = Column("id", "INT UNSIGNED", primary_key=True, auto_increment=True)
-    tname = Column("name", "VARCHAR(255)")
-    capacity = Column("Capacity", "INT UNSIGNED")
+    t_name = Column("t_name", "VARCHAR(255)")
+    capacity = Column("capacity", "INT UNSIGNED")
 
     def __init__(
         self,
-        name: str,
+        t_name: str,
         capacity: int,
         id: Union[int, None] = None,
     ) -> None:
         self.id = id
-        self.name = name
-        self.Capacity = capacity
+        self.t_name = t_name
+        self.capacity = capacity
 
 
 class TheaterRate(BaseModel):
@@ -632,7 +632,7 @@ class Showtime(BaseModel):
                 item[movie_id],
             )
             show_obj.theater = Theater(
-                item[Theater.tname.name], item[Theater.capacity.name], item[theater_id]
+                item[Theater.t_name.name], item[Theater.capacity.name], item[theater_id]
             )
             list.append(show_obj)
         return list

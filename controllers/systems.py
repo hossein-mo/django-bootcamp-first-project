@@ -371,6 +371,8 @@ class Reports:
             response = Reports.get_commetns(user, data)
         elif request['subtype'] == 'showseats':
             response = Reports.get_seats(user, data)
+        elif request['subtype'] == 'getsubs':
+            response = Reports.get_subs(user)
         else:
             raise Excs.InvalidRequest
         return response
@@ -405,6 +407,12 @@ class Reports:
         data['show_id'] = int(data['show_id'])
         seats = mod.Showtime.get_reserved_seat(data['show_id'])
         response = create_response(True, "report", "List of reserved seats!", data={'show_id': data['show_id'], 'reserved_seats': seats})
+        return response
+    
+    @staticmethod
+    def get_subs(user: mod.User):
+        subs = mod.Subscription.fetch()
+        response = create_response(True, "report", "List of reserved seats!", data=subs)
         return response
 
 

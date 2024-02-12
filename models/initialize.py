@@ -45,3 +45,12 @@ class initialize:
         for cls in create_list:
             queries.append(cls.create_table_query())
         db.transaction(queries)
+        
+    @staticmethod
+    def create_subs():
+        av = mod.Subscription.fetch()
+        if not av:
+            silver_sub = mod.Subscription('Silver', 20, 100000, 30, 3)
+            gold_sub = mod.Subscription('Gold', 50, 200000, 30, None)
+            silver_sub.insert()
+            gold_sub.insert()

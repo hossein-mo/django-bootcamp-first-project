@@ -1,4 +1,5 @@
 import os
+from re import sub
 import sys
 from datetime import datetime, date
 from mysql.connector import Error as dbError
@@ -139,11 +140,12 @@ class User(BaseModel):
                 subs = Subscription.fetch_obj(
                     where=f"{Subscription.id} = {user_sub.subscription_id}"
                 )
+                subs = sub[0]
                 sub_exp = (user_sub.expire_date - datetime.now()).days
             else:
                 sub_exp = "unlimited"
-                subs = Subscription("Bronze", 0, duration="unlimited")
-            user.subs = subs[0]
+                subs = Subscription("Bronze", 0, 0, sub_exp, None)
+            user.subs = subs
             user.sub_exp = sub_exp
             return user
 
@@ -174,7 +176,7 @@ class User(BaseModel):
         password = hash_password(password)
         rightnow = datetime.now()
         sub_exp = "unlimited"
-        subs = Subscription("Bronze", 0, duration=sub_exp)
+        subs = Subscription("Bronze", 0, 0, duration=sub_exp)
         user = cls(
             username,
             password,
@@ -307,11 +309,13 @@ class Subscription(BaseModel):
     discount = Column("discount", "SMALLINT UNSIGNED")
     duration = Column("duration", "SMALLINT UNSIGNED")
     order_number = Column("order_number", "VARCHAR(255)", null=True)
+    price = Column("price", "INT UNSIGNED")
 
     def __init__(
         self,
         s_name: str,
         discount: int,
+        price: int,
         duration=30,
         order_number=0,
         id: Union[int, None] = None,
@@ -321,6 +325,7 @@ class Subscription(BaseModel):
         self.discount = discount
         self.duration = duration
         self.order_number = order_number
+        self.price = price
 
     def set_new_subscription(self):
         self.insert()

@@ -8,12 +8,17 @@ class TCPClient:
     size_bytes_length: int
     client_socket: socket.socket
 
-    def __init__(self, host: str, port: int, size_length: int = 4) -> None:
-        self.host = host
-        self.port = port
-        self.size_bytes_length = size_length
-        self.client_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        self.client_socket.connect((self.host, self.port))
+    _instance = None
+
+    def __new__(cls, host: str, port: int, size_length: int = 4) -> 'TCPClient':
+        if cls._instance is None:
+            cls._instance = super().__new__(cls)
+            cls._instance.host = host
+            cls._instance.port = port
+            cls._instance.size_bytes_length = size_length
+            cls._instance.client_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            cls._instance.client_socket.connect((cls._instance.host, cls._instance.port))
+        return cls._instance
 
     def recive(self) -> dict | None:
         size = self.client_socket.recv(self.size_bytes_length)

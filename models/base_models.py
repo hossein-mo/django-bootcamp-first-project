@@ -257,7 +257,9 @@ class BaseModel:
                 v = obj_dict[column.name].value
             else:
                 v = obj_dict[column.name]
-            if column.as_string:
+            if v == None:
+                values = f'{values}NULL,'
+            elif column.as_string:
                 values = f'{values}"{v}",'
             else:
                 values = f"{values}{v},"

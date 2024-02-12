@@ -14,6 +14,7 @@ from controllers.systems import (
     AccountManagement,
     CinemaManagement,
     Reports,
+    Review,
 )
 from loging.log import Log
 
@@ -74,29 +75,17 @@ class TCPServer:
                     if not request:
                         break
                     if request["type"] == "profile":
-                        if request["subtype"] == "update":
-                            response, user = UserManagement.edit_profile(
-                                user, request["data"]
-                            )
-                        elif request["subtype"] == "changepass":
-                            response = UserManagement.change_password(
-                                user, request["data"]
-                            )
-                        elif request["subtype"] == "changerole":
-                            response = UserManagement.change_user_role(
-                                user, request["data"]
-                            )
+                        response = UserManagement.process(user, request)
                     elif request["type"] == "account":
-                        if request["subtype"] == "add":
-                            response = AccountManagement.add_account_user(
-                                user, request["data"]
-                            )
-                        elif request["subtype"] == "list":
-                            response = AccountManagement.get_user_accounts(user)
+                        response = AccountManagement.process(user, request)
                     elif request["type"] == "management":
                         response = CinemaManagement.process(user, request)
                     elif request["type"] == "report":
                         response = Reports.process(user, request)
+                    elif request["type"] == "report":
+                        response = Reports.process(user, request)
+                    elif request["type"] == 'review':
+                        response = Review.process(user, request)
                     else:
                         response = create_response(False, "user", "Invalid request.")
                 except DatabaseError as err:

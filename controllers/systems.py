@@ -6,6 +6,7 @@ sys.path.append(os.path.dirname(os.path.dirname(__file__)))
 import controllers.handlers.user_handlers as uHandlers
 import controllers.handlers.account_handlers as baHandlers
 import controllers.handlers.cinema_handlers as cHandlers
+import controllers.handlers.review_handlers as rHandlers
 import utils.exceptions as Excs
 import models.models as mod
 from loging.log import Log
@@ -77,8 +78,26 @@ class UserManagement:
         return response, user
 
     @staticmethod
+    def process(user: mod.User, request: dict):
+        if request["subtype"] == "info":
+            response = create_response(True, "user", "", data=user.info())
+        elif request["subtype"] == "update":
+            response = UserManagement.edit_profile(user, request["data"])
+        elif request["subtype"] == "changepass":
+            response = UserManagement.change_password(user, request["data"])
+        elif request["subtype"] == "changerole":
+            response = UserManagement.change_user_role(user, request["data"])
+        return response
+
+    @staticmethod
     def edit_profile(user: mod.User, data: dict):
         data["user"] = user
+        if "username" not in data:
+            data["username"] = user.username
+        if "email" not in data:
+            data["email"] = user.email
+        if "phone_number" not in data:
+            data["phone_number"] = user.phone_number
         username = user.username
         useremail = user.email
         userphone = user.phone_number
@@ -98,8 +117,7 @@ class UserManagement:
             response = create_response(False, "user", err.message)
         except Excs.DuplicatedEntry as err:
             response = create_response(False, "user", "Username or email are in use!")
-        finally:
-            return response, user
+        return response
 
     @staticmethod
     def change_password(user: mod.User, data: dict):
@@ -154,6 +172,43 @@ class AccountManagement:
     loging: Log
 
     @staticmethod
+    def process(user: mod.User, request: dict):
+        data = request["data"]
+        if request["subtype"] == "add":
+            response = AccountManagement.add_account_user(user, data)
+        elif request["subtype"] == "list":
+            response = AccountManagement.get_user_accounts(user)
+        elif request["subtype"] == "deposit":
+            data["dest"] = user.accounts[int(data["account_id"])]
+            data["card"] = data["dest"]
+            data["origin"] = "deposit"
+            data["transfer_type"] = "deposit"
+            response = AccountManagement.account_transfer(user, data)
+        elif request["subtype"] == "withdraw":
+            data["origin"] = user.accounts[int(data["account_id"])]
+            data["card"] = data["origin"]
+            data["password"] = str(data["password"])
+            data["cvv2"] = str(data["cvv2"])
+            data["dest"] = "withdraw"
+            data["transfer_type"] = "withdraw"
+            response = AccountManagement.account_transfer(user, data)
+        elif request["subtype"] in {"transfer", "userbalance"}:
+            if request["subtype"] == "transfer":
+                data["origin"] = user.accounts[int(data["from_id"])]
+                data["dest"] = user.accounts[int(data["to_id"])]
+                data["transfer_type"] = request["subtype"]
+            else:
+                data["origin"] = user.accounts[int(data["account_id"])]
+                data["dest"] = user
+                data["transfer_type"] = request["subtype"]
+            data["password"] = str(data["password"])
+            data["cvv2"] = str(data["cvv2"])
+            response = AccountManagement.account_transfer(user, data)
+        else:
+            raise KeyError
+        return response
+
+    @staticmethod
     def add_account_user(user: mod.User, data: dict) -> dict:
         data = {"user": user, "card_info": data}
         account = baHandlers.AddAccount()
@@ -162,6 +217,7 @@ class AccountManagement:
             AccountManagement.loging.log_action(
                 f"New bank account added for user. username: {user.username}, id: {user.id}"
             )
+            print(user.accounts)
             return create_response(
                 True,
                 "account",
@@ -173,34 +229,56 @@ class AccountManagement:
 
     @staticmethod
     def get_user_accounts(user) -> List[mod.BankAccount]:
-        user_accs = mod.BankAccount.fetch_obj(
-            where=f"{mod.BankAccount.user_id} = {user.id}"
-        )
         return create_response(
-            True, "account", "", data={"accounts": [acc.info() for acc in user_accs]}
+            True, "account", "", data=[acc.info() for acc in user.accounts.values()]
         )
 
-    # @staticmethod
-    # def money_transfer(user: User, request: dict) -> dict:
-    #     data = request['data']
-    #     data['user'] = user
-    #     data['amount'] = int(data['amount'])
-    #     if request['subtype'] == 'deposit':
-    #         data['origin'] = 'deposit'
-    #         if data['dest'] == 'userbalance':
-    #             data['dest'] = user
-    #         else:
-    #             data['dest'] = int(data['dest'])
-    #     elif request['subtype'] == 'withdrawal':
-    #         data['dest'] == 'withdrawal'
-    #         data['origin'] = int(data['origin'])
-    #     elif request['subtype'] == 'transfer':
-
-    # @staticmethod
-    # def wallet_deposit(user: User, account_id: int) -> None:
-    #     account = BankAccount.fetch_obj(
-    #         where=f'{BankAccount.id} = "{account_id}" AND {BankAccount.user_id} = "{user.id}"'
-    #     )
+    @staticmethod
+    def account_transfer(user: mod.User, data: dict) -> None:
+        handler = baHandlers.AccountCredentialsCheck()
+        balance_check = baHandlers.BalanceCheck()
+        transf = baHandlers.TransferHandler()
+        try:
+            handler.set_next(balance_check).set_next(transf)
+            if data["transfer_type"] == "transfer":
+                log_message = (
+                    f"User {data['transfer_type']}, amount: {data['amount']} from card number: "
+                    + f"{data['origin'].card_number}, card id: {data['dest'].id}. to card number: "
+                    + f"{data['dest'].card_number}, card id: {data['dest'].id}. "
+                    + f"username: {user.username}, user id: {user.id}"
+                )
+                res_message = (
+                    f"Your {data['transfer_type']} of {data['amount']} from {data['origin'].card_number} "
+                    + f"to {data['dest'].card_number} was successful"
+                )
+            elif data["transfer_type"] == "userbalance":
+                log_message = (
+                    f"User adds fund to wallet, amount: {data['amount']} from card number: "
+                    + f"{data['origin'].card_number}, card id: {data['dest'].id}. "
+                    + f"username: {user.username}, user id: {user.id}, user balance: {user.balance} ."
+                )
+                res_message = f"{data['amount']} added to your balance."
+            else:
+                log_message = (
+                    f"User {data['transfer_type']}, amount: {data['amount']} card number: "
+                    + f"{data['card'].card_number}, card id: {data['card'].id}. "
+                    + f"username: {user.username}, user id: {user.id}"
+                )
+                res_message = f"Your {data['transfer_type']} of {data['amount']} was successful. Affected card number {data['card'].card_number} "
+            data = handler.handle(data)
+            status = True
+        except (Excs.WrongBankAccCreds, Excs.NotEnoughBalance) as err:
+            log_message = (
+                f"Failed transfer of money reason: {err.message}, info: " + log_message
+            )
+            res_message = err.message
+            status = False
+        AccountManagement.loging.log_transaction(log_message)
+        return create_response(
+            status,
+            "account",
+            message=res_message,
+        )
 
 
 class CinemaManagement:
@@ -211,9 +289,9 @@ class CinemaManagement:
         data = request["data"]
         if request["subtype"] == "addmovie":
             response = CinemaManagement.add_movie(user, data)
-        if request["subtype"] == "addtheater":
+        elif request["subtype"] == "addtheater":
             response = CinemaManagement.add_theater(user, data)
-        if request["subtype"] == "addshow":
+        elif request["subtype"] == "addshow":
             response = CinemaManagement.add_show(user, data)
         else:
             raise KeyError
@@ -285,10 +363,12 @@ class Reports:
         data = request["data"]
         if request["subtype"] == "theaterlist":
             response = Reports.get_theaters(user)
-        if request["subtype"] == "movielist":
+        elif request["subtype"] == "movielist":
             response = Reports.get_movies(user)
-        if request["subtype"] == "showlist":
+        elif request["subtype"] == "showlist":
             response = Reports.get_shows(user)
+        elif request["subtype"] == "getcomments":
+            response = Reports.get_commetns(user, data)
         else:
             raise Excs.InvalidRequest
         return response
@@ -305,9 +385,67 @@ class Reports:
         data = mod.Movie.get_movies_list()
         response = create_response(True, "report", "List of movies!", data=data)
         return response
-    
+
     @staticmethod
     def get_shows(user: mod.User):
         data = mod.Showtime.get_shows_list()
         response = create_response(True, "report", "List of shows!", data=data)
         return response
+    
+    @staticmethod
+    def get_commetns(user: mod.User, data: dict):
+        comms = mod.Comment.get_comments(data['movie_id'])
+        response = create_response(True, "report", "List of shows!", data={'commetns': comms})
+        return response
+
+
+class Review:
+    loging: Log
+
+    @staticmethod
+    def process(user: mod.User, request: dict):
+        data = request["data"]
+        if request["subtype"] == "movierate":
+            response = Review.submmit_movie_rate(user, data)
+        elif request["subtype"] == "theaterrate":
+            response = Review.submmit_theater_rate(user, data)
+        elif request["subtype"] == "comment":
+            response = Review.write_comment(user, data)
+        else:
+            raise Excs.InvalidRequest
+        return response
+
+    @staticmethod
+    def submmit_movie_rate(user: mod.User, data: dict):
+        data["user"] = user
+        handler = rHandlers.SubmitMovieRate()
+        try:
+            handler.handle(data)
+            Review.loging.log_action(
+                f"Review submited. username: {user.username}, "
+                + f"user id {user.id}, movie id: {data['movie_id']}, rate: {data['rate']}"
+            )
+        except Excs.UnvalidRate as err:
+            return create_response(False, "review", err.message)
+        return create_response(True, "review", "Movie rate submited.")
+
+    def submmit_theater_rate(user: mod.User, data: dict):
+        data["user"] = user
+        handler = rHandlers.SubmitTheaterRate()
+        try:
+            handler.handle(data)
+            Review.loging.log_action(
+                f"Review submited. username: {user.username}, "
+                + f"user id {user.id}, theater id: {data['theater_id']}, rate: {data['rate']}"
+            )
+        except Excs.UnvalidRate as err:
+            return create_response(False, "review", err.message)
+        return create_response(True, "review", "Theater review submited.")
+
+    def write_comment(user: mod.User, data: dict):
+        data['user'] = user
+        handler = rHandlers.WriteComment()
+        handler.handle(data)
+        comm = data['comment']
+        Review.loging.log_action(f"User wrote a comment. info: {comm.info()}")
+        return create_response(True, 'review', '', comm.info())

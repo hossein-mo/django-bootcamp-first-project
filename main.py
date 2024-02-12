@@ -16,8 +16,10 @@ if __name__ == "__main__":
         log = initialize.run_log_module(**config['logs'])
         db = initialize.run_db_connection(config['database'])
         initialize.create_tables(db)
+        initialize.create_subs()
     except DatabaseError as err:
         print(f"Problem starting server check your logs.")
     else:
         server = TCPServer(**config['server'])
+
         server.start_server()

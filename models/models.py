@@ -639,15 +639,16 @@ class Showtime(BaseModel):
             }
         )
 
-    def get_reserved_seat(self) -> list[int]:
+    @staticmethod
+    def get_reserved_seat(show_id: int) -> list[int]:
         """Returns reserved seat numbers of given show
 
         Returns:
             list: List of reserved seat number
         """
-        results = Showtime.fetch(
-            select=Order.seat_number.name,
-            where=f"{Order.showtime_id.name} = {self.id} AND {Order.cancel_date.name} IS NULL",
+        results = Order.fetch(
+            select=(Order.seat_number.name,),
+            where=f"{Order.showtime_id} = {show_id} AND {Order.cancel_date} IS NULL",
         )
         return [d[Order.seat_number.name] for d in results]
 

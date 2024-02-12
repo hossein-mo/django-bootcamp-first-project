@@ -444,11 +444,11 @@ class Comment(BaseModel):
     @staticmethod
     def get_comments(movie_id) -> list["Comment"]:
         result = []
-        query = """
+        query = f"""
                 WITH RECURSIVE CommentTree AS (
                 SELECT c.*, CAST(c.id AS CHAR(200)) AS path
                 FROM comment c
-                WHERE c.parent_id IS NULL
+                WHERE c.parent_id IS NULL AND c.movie_id = {movie_id}
 
                 UNION ALL
 
@@ -456,7 +456,7 @@ class Comment(BaseModel):
                 FROM comment c2
                 INNER JOIN CommentTree ct ON c2.parent_id = ct.id
                 )
-                SELECT id, user_id, movie_id, parent_id, text, created_at
+                SELECT id, user_id, movie_id, parent_id, text, created_at, LENGTH(path) - LENGTH(REPLACE(path, '/', '')) AS depth
                 FROM CommentTree
                 ORDER BY path;
                 """

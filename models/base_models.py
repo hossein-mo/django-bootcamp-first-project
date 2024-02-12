@@ -1,13 +1,14 @@
 import os
 import sys
-from enum import Enum
+from enum import Enum, EnumMeta
 from typing import Union, Any, List, Dict
 from mysql.connector import Error as dbError
 from mysql.connector import IntegrityError
 
 sys.path.append(os.path.dirname(os.path.dirname(__file__)))
 from models.database import DatabaseConnection
-from models.model_exceptions import DuplicatedEntry
+from utils.exceptions import DuplicatedEntry, DatabaseError
+from loging.log import Log
 
 
 class Column:
@@ -88,11 +89,17 @@ class Column:
 
 class BaseModel:
     name: str
-    db_obj = DatabaseConnection()
+    db_obj: DatabaseConnection
+    loging: Log
+
+    def info(self) -> dict:
+        return self.__dict__
 
     @classmethod
     def create_new(cls, **kwargs):
-        return cls(**kwargs)
+        new = cls(**kwargs)
+        new.insert()
+        return new
 
     @classmethod
     def get_columns(cls) -> List[Column]:
@@ -128,7 +135,7 @@ class BaseModel:
         Returns:
             str: Create table query.
         """
-        query = f"CREATE TABLE {cls.name} (\n"
+        query = f"CREATE TABLE IF NOT EXISTS `{cls.name}` (\n"
         primary_keys = []
         unique_keys = []
         foreign_keys = {}
@@ -167,8 +174,10 @@ class BaseModel:
         try:
             cls.db_obj.execute(query)
         except dbError as err:
-            print(f'Error while creating "{cls.name}" table.')
-            print(f"Error description: {err}")
+            cls.loging.log_errors(err.msg)
+            raise DatabaseError
+        else:
+            cls.loging.log_info(f"{cls.name} table succesfully created in the database")
 
     @classmethod
     def fetch(
@@ -185,7 +194,7 @@ class BaseModel:
         Returns:
             dict: List of fetched rows as dictionary of selected columns
         """
-        query = f'SELECT {",".join(select)} FROM {cls.name}'
+        query = f'SELECT {",".join(select)} FROM `{cls.name}`'
         if where:
             query = f"{query} WHERE {where}"
         if order_by:
@@ -199,9 +208,9 @@ class BaseModel:
         try:
             results = cls.db_obj.fetch(query)
         except dbError as err:
-            print(f'Error while fetching from "{cls.name}".')
-            print(f"Error description: {err}")
-            return []
+            cls.loging.log_errors(err.msg)
+            result = []
+            raise DatabaseError
         else:
             return results
 
@@ -272,16 +281,15 @@ class BaseModel:
         column_names = [column.name for column in columns]
         clm = ", ".join(tuple(column_names))
         values = self.get_comma_seperated(columns)
-        query = f"INSERT INTO {cls.name} ({clm})\nVALUES ({values[:-1]});"
+        query = f"INSERT INTO `{cls.name}` ({clm})\nVALUES ({values[:-1]});"
         try:
             _, rowid = self.db_obj.execute(query)
         except IntegrityError as err:
-            print(f'Error while inserting new row into "{cls.name}".')
-            print(f"Error description: {err}")
+            cls.loging.log_errors(err.msg)
             raise DuplicatedEntry(err.msg)
         except dbError as err:
-            print(f'Error while inserting new row into "{cls.name}".')
-            print(f"Error description: {err}")
+            cls.loging.log_errors(err.msg)
+            raise DatabaseError
         else:
             if set_from_db:
                 self.__dict__[set_from_db.name] = rowid
@@ -330,23 +338,52 @@ class BaseModel:
         try:
             rowcount, _ = self.db_obj.execute(query)
         except IntegrityError as err:
-            print(f'Error while inserting new row into "{self.name}".')
-            print(f"Error description: {err}")
+            self.loging.log_errors(err.msg)
             raise DuplicatedEntry(err.msg)
         except dbError as err:
-            print(f'Error updating "{self.name}".')
-            print(f"Error description: {err}")
-            return 0
+            self.loging.log_errors(err.msg)
+            rowcount = 0
+            raise DatabaseError
         else:
             for column in colval:
                 self.__dict__[column.name] = colval[column]
             return rowcount
 
     def delete(self, where: str = "default") -> int:
-        pass
+        query = f"DELETE FROM {self.name} WHERE"
+        if where == "default":
+            cls = self.__class__
+            obj_dict = self.__dict__
+            pks = cls.get_primary_keys()
+            for pk in pks:
+                query = f'{query} {pk.name}="{obj_dict[pk.name]}" AND'
+            query = f"{query[:-4]};"
+        else:
+            query = f"{query} {where}"
+        try:
+            rowcount, _ = self.db_obj.execute(query)
+        except dbError as err:
+            self.loging.log_errors(err.msg)
+            raise DatabaseError
+            rowcount = 0
+        else:
+            return rowcount
 
 
-class UserRole(Enum):
+class MetaEnum(EnumMeta):
+    def __contains__(cls, item):
+        try:
+            cls(item)
+        except ValueError:
+            return False
+        return True
+
+
+class BaseEnum(Enum, metaclass=MetaEnum):
+    pass
+
+
+class UserRole(BaseEnum, metaclass=MetaEnum):
     ADMIN = "admin"
     STAFF = "staff"
     USER = "user"
@@ -359,3 +396,6 @@ class UserRole(Enum):
             str: comma seperated string
         """
         return ", ".join([f"'{role.value}'" for role in cls])
+
+    def __str__(self) -> str:
+        return str(self.value)

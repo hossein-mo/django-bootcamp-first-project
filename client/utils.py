@@ -1,5 +1,7 @@
 import os
 
+from tcp_client import TCPClient
+
 def create_request(type: str, subtype: str = '', data: dict = {}) -> dict:
     """creates request dictionary
 
@@ -55,6 +57,12 @@ class CinemaReservationApp:
         #         self.navigate_back()
         #     else:
         #         self.current_page.handle_input(user_input, self)
+    
+    def restart(self):
+        TCPClient().close()
+        self.current_page = self.page_cache[0]
+        self.page_cache = []
+        self.current_page.display()
 
 
 from abc import ABC, abstractmethod

@@ -1,5 +1,5 @@
 from getpass import getpass
-from .utils import create_request, clear_screen, Response, Page
+from utils import create_request, clear_screen, Response, Page
 from tcp_client import TCPClient
 
 
@@ -22,21 +22,27 @@ class MovieListPage(Page):
 
     def display(self):
         clear_screen()
-        client = TCPClient()
-        request = create_request(type="movie", subtype="list")
-        client.send(request)
-        response = client.recive()
-        response = Response(**response)
-        if response.status:
-            movie_list = response.data["movies"]
-            for movie in movie_list:
+        if len(self.account_list) == 0:
+            client = TCPClient()
+            request = create_request(type="movie", subtype="list")
+            client.send(request)
+            response = client.recive()
+            response = Response(**response)
+            if response.status:
+                MovieListPage.movie_list = response.data["movies"]
+                for movie in self.movie_list:
+                    print(f'{movie["id"]}. {movie["title"]} ({movie["year"]})')
+                print(f"\nEnter a movie ID to see details, or press Zero to go back...")
+                self.handle_input(input())
+            else:
+                print("Connection Error! Try again...")
+                input("Press any key to go back... ")
+                self.handle_input("0")
+        else:
+            for movie in self.movie_list:
                 print(f'{movie["id"]}. {movie["title"]} ({movie["year"]})')
             print(f"\nEnter a movie ID to see details, or press Zero to go back...")
             self.handle_input(input())
-        else:
-            print("Connection Error! Try again...")
-            input("Press any key to go back... ")
-            self.handle_input("0")
 
     def handle_input(self, user_input):
         if user_input == "0":

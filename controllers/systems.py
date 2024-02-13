@@ -1,12 +1,15 @@
+from cgitb import handler
 import os
 import sys
 from typing import List
+from urllib import response
 
 sys.path.append(os.path.dirname(os.path.dirname(__file__)))
 import controllers.handlers.user_handlers as uHandlers
 import controllers.handlers.account_handlers as baHandlers
 import controllers.handlers.cinema_handlers as cHandlers
 import controllers.handlers.review_handlers as rHandlers
+import controllers.handlers.order_handlers as oHandlers
 import utils.exceptions as Excs
 import models.models as mod
 from loging.log import Log
@@ -217,7 +220,6 @@ class AccountManagement:
             AccountManagement.loging.log_action(
                 f"New bank account added for user. username: {user.username}, id: {user.id}"
             )
-            print(user.accounts)
             return create_response(
                 True,
                 "account",
@@ -369,9 +371,9 @@ class Reports:
             response = Reports.get_shows(user)
         elif request["subtype"] == "getcomments":
             response = Reports.get_commetns(user, data)
-        elif request['subtype'] == 'showseats':
+        elif request["subtype"] == "showseats":
             response = Reports.get_seats(user, data)
-        elif request['subtype'] == 'getsubs':
+        elif request["subtype"] == "getsubs":
             response = Reports.get_subs(user)
         else:
             raise Excs.InvalidRequest
@@ -395,20 +397,27 @@ class Reports:
         data = mod.Showtime.get_shows_list()
         response = create_response(True, "report", "List of shows!", data=data)
         return response
-    
+
     @staticmethod
     def get_commetns(user: mod.User, data: dict):
-        comms = mod.Comment.get_comments(data['movie_id'])
-        response = create_response(True, "report", "List of shows!", data={'commetns': comms})
+        comms = mod.Comment.get_comments(data["movie_id"])
+        response = create_response(
+            True, "report", "List of shows!", data={"commetns": comms}
+        )
         return response
-    
+
     @staticmethod
     def get_seats(user: mod.User, data: dict):
-        data['show_id'] = int(data['show_id'])
-        seats = mod.Showtime.get_reserved_seat(data['show_id'])
-        response = create_response(True, "report", "List of reserved seats!", data={'show_id': data['show_id'], 'reserved_seats': seats})
+        data["show_id"] = int(data["show_id"])
+        seats = mod.Showtime.get_reserved_seat(data["show_id"])
+        response = create_response(
+            True,
+            "report",
+            "List of reserved seats!",
+            data={"show_id": data["show_id"], "reserved_seats": seats},
+        )
         return response
-    
+
     @staticmethod
     def get_subs(user: mod.User):
         subs = mod.Subscription.fetch()
@@ -421,7 +430,8 @@ class Review:
 
     @staticmethod
     def process(user: mod.User, request: dict):
-        data = request["data"]
+        if "data" in request:
+            data = request["data"]
         if request["subtype"] == "movierate":
             response = Review.submmit_movie_rate(user, data)
         elif request["subtype"] == "theaterrate":
@@ -460,9 +470,40 @@ class Review:
         return create_response(True, "review", "Theater review submited.")
 
     def write_comment(user: mod.User, data: dict):
-        data['user'] = user
+        data["user"] = user
         handler = rHandlers.WriteComment()
         handler.handle(data)
-        comm = data['comment']
+        comm = data["comment"]
         Review.loging.log_action(f"User wrote a comment. info: {comm.info()}")
-        return create_response(True, 'review', '', comm.info())
+        return create_response(True, "review", "", comm.info())
+
+
+class OrderManagement:
+    loging: Log
+
+    @staticmethod
+    def process(user: mod.User, request: dict) -> dict:
+        if "data" in request:
+            data = request["data"]
+        if request["subtype"] == "subs":
+            response = OrderManagement.order_subs(user, data)
+        return response
+
+    @staticmethod
+    def order_subs(user: mod.User, data: dict) -> dict:
+        data["dest"] = "withdraw"
+        data["origin"] = user
+        data["user"] = user
+        handler = oHandlers.SubCheck()
+        balance_check = baHandlers.BalanceCheck()
+        transf = baHandlers.TransferHandler()
+        buy_sub = oHandlers.BuySub()
+        inovice = oHandlers.CreateSubInovice()
+        handler.set_next(balance_check).set_next(transf).set_next(buy_sub).set_next(inovice)
+        try:
+            data = handler.handle(data)
+            response = create_response(True, 'order', 'Order successful!', data=data['inovice'])
+        except (Excs.NotFound, Excs.NotEnoughBalance) as err:
+            response = create_response(False, 'order', err.message)
+        return response
+    

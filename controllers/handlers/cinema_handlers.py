@@ -1,16 +1,15 @@
-import os
-import sys
-import re
 from datetime import datetime
-from typing import Any, Dict, Optional
-
-sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(__file__))))
 from models.models import Movie, Theater, Showtime
 from controllers.handlers.abstract_handler import AbstractHandler
 from utils.exceptions import TheaterNotExist, MovieNotExist, ShowTimeError
 
 
 class CheckMovieInfo(AbstractHandler):
+    """
+    Handler for checking if requested movie info are correct or not.
+
+    """
+
     def handle(self, data: dict) -> dict | None:
         selected_keys = ["m_name", "duration", "age_rating"]
         data = {key: data[key] for key in selected_keys if key in data}
@@ -23,6 +22,11 @@ class CheckMovieInfo(AbstractHandler):
 
 
 class AddMovie(AbstractHandler):
+    """
+    Handler for adding movie to cimena
+
+    """
+
     def handle(self, data: dict) -> dict | None:
         movie = Movie.create_new(**data)
         data = movie.info()
@@ -33,6 +37,11 @@ class AddMovie(AbstractHandler):
 
 
 class CheckTheaterInfo(AbstractHandler):
+    """
+    Handler for check if requested theater info are correct or not
+
+    """
+
     def handle(self, data: dict) -> dict | None:
         selected_keys = ["t_name", "capacity"]
         data = {key: data[key] for key in selected_keys if key in data}
@@ -44,6 +53,11 @@ class CheckTheaterInfo(AbstractHandler):
 
 
 class AddTheater(AbstractHandler):
+    """
+    Handler for adding theater to cinema
+
+    """
+
     def handle(self, data: dict) -> dict | None:
         theater = Theater.create_new(**data)
         data = theater.info()
@@ -54,6 +68,11 @@ class AddTheater(AbstractHandler):
 
 
 class CheckTheater(AbstractHandler):
+    """
+    Handler for checking if requested theater exists or not
+
+    """
+
     def handle(self, data: dict) -> dict | None:
         theater_id = int(data["theater_id"])
         theater = Theater.fetch(where=f'{Theater.id}="{theater_id}"')
@@ -68,6 +87,11 @@ class CheckTheater(AbstractHandler):
 
 
 class CheckMovie(AbstractHandler):
+    """
+    Handler for checking if requester movie exists or not
+
+    """
+
     def handle(self, data: dict) -> dict | None:
         movie_id = int(data["movie_id"])
         movie = Movie.fetch_obj(where=f'{Movie.id}="{movie_id}"')
@@ -82,6 +106,11 @@ class CheckMovie(AbstractHandler):
 
 
 class CheckShowTime(AbstractHandler):
+    """
+    Handler for checking if a show exists, if its time overlaps with other shows and if show duration is enough for the movie
+
+    """
+
     def handle(self, data: dict) -> dict | None:
         start_date = datetime.strptime(data["start_date"], "%Y-%m-%d %H:%M:%S")
         end_date = datetime.strptime(data["end_date"], "%Y-%m-%d %H:%M:%S")
@@ -120,6 +149,11 @@ class CheckShowTime(AbstractHandler):
 
 
 class AddShow(AbstractHandler):
+    """
+    Handler for adding show to cinema time table
+
+    """
+
     def handle(self, data: dict) -> dict | None:
         data["price"] = int(data["price"])
         show = Showtime.create_new(**data)

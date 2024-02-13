@@ -1,8 +1,5 @@
 
-import sys
 from pathlib import Path
-
-sys.path.append(Path(__file__).parent)
 from controllers.server import TCPServer
 from models.initialize import initialize
 from utils.utils import config_loader

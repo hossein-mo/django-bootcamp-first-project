@@ -1,17 +1,17 @@
-import os
-import sys
 import re
 from datetime import date
-from typing import Any, Dict, Optional
-
-sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(__file__))))
 from controllers.handlers.abstract_handler import AbstractHandler
-from utils.exceptions import PasswordPolicyNotPassed, InvalidUserInfo, DuplicatedEntry, WrongCredentials
+from utils.exceptions import PasswordPolicyNotPassed, InvalidUserInfo, WrongCredentials
 from models.models import User, UserRole
 from utils.utils import hash_password
 
 
 class UsernameVerification(AbstractHandler):
+    """
+    Handler for username format verification
+
+    """
+
     def handle(self, data: dict) -> dict | None:
         username = data["username"]
         if (
@@ -25,6 +25,11 @@ class UsernameVerification(AbstractHandler):
 
 
 class EmailVerification(AbstractHandler):
+    """
+    Handler for email format
+
+    """
+
     def handle(self, data: dict) -> dict | None:
         email_pattern = re.compile(r"^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$")
         if not bool(email_pattern.match(data["email"])):
@@ -35,10 +40,15 @@ class EmailVerification(AbstractHandler):
 
 
 class PhoneVerification(AbstractHandler):
+    """
+    Handler for phone number format verification
+
+    """
+
     def handle(self, data: dict) -> dict | None:
-        if 'phone_number' not in data:
-            data['phone_number'] = None
-        elif data['phone_number']:
+        if "phone_number" not in data:
+            data["phone_number"] = None
+        elif data["phone_number"]:
             phone_pattern = re.compile(r"^(09[0-3][0-9]-?[0-9]{3}-?[0-9]{4})$")
             if not bool(phone_pattern.match(data["phone_number"])):
                 raise InvalidUserInfo(
@@ -48,6 +58,11 @@ class PhoneVerification(AbstractHandler):
 
 
 class BirthDateVerification(AbstractHandler):
+    """
+    Handler for birth date format verification
+
+    """
+
     def handle(self, data: dict) -> dict | None:
         birth_date_pattern = re.compile(r"^\d{4}-\d{2}-\d{2}$")
         if not bool(birth_date_pattern.match(data["birth_date"])):
@@ -60,6 +75,11 @@ class BirthDateVerification(AbstractHandler):
 
 
 class PasswordPolicyVerification(AbstractHandler):
+    """
+    Handler for password policy verification
+
+    """
+
     def __init__(self) -> None:
         self.min_length = 8
         self.include_special = True
@@ -84,6 +104,11 @@ class PasswordPolicyVerification(AbstractHandler):
 
 
 class CreateUserHandler(AbstractHandler):
+    """
+    Handler for creating new user
+
+    """
+
     def handle(self, data: dict) -> dict:
         user = User.create_new(**data)
         data["user"] = user
@@ -94,6 +119,11 @@ class CreateUserHandler(AbstractHandler):
 
 
 class ChangePassword(AbstractHandler):
+    """
+    Handler for changing password
+
+    """
+
     def handle(self, data: dict) -> dict | None:
         password = data["password"]
         old_password = data["old_password"]
@@ -101,7 +131,7 @@ class ChangePassword(AbstractHandler):
         if hash_password(old_password) == user.password:
             user.update({User.password: hash_password(password)})
         else:
-            raise WrongCredentials('Wrong password!')
+            raise WrongCredentials("Wrong password!")
         if self._next_handler:
             return super().handle(data)
         else:
@@ -109,6 +139,11 @@ class ChangePassword(AbstractHandler):
 
 
 class ProfileInfoUpdate(AbstractHandler):
+    """
+    Handler for updating user info
+
+    """
+
     def handle(self, data: dict) -> dict | None:
         new_username = data["username"]
         new_email = data["email"]
@@ -128,6 +163,11 @@ class ProfileInfoUpdate(AbstractHandler):
 
 
 class LoginHandler(AbstractHandler):
+    """
+    Handler for user login
+
+    """
+
     def handle(self, data: dict) -> dict | None:
         user = User.authenticate(data)
         user.update_last_login()
@@ -139,8 +179,13 @@ class LoginHandler(AbstractHandler):
 
 
 class ChangeUserRole(AbstractHandler):
+    """
+    Handler for changing user role
+
+    """
+
     def handle(self, data: dict) -> dict | None:
-        if data['new_role'] in UserRole:
+        if data["new_role"] in UserRole:
             if "username" in data:
                 username = data["username"]
                 affected_user = User.fetch_obj(where=f'{User.username}="{username}"')
@@ -149,11 +194,11 @@ class ChangeUserRole(AbstractHandler):
                 affected_user = User.fetch_obj(where=f'{User.email}="{email}"')
             if affected_user:
                 affected_user = affected_user[0]
-                affected_user.role = UserRole(data['new_role'])
+                affected_user.role = UserRole(data["new_role"])
                 affected_user.update({User.role: affected_user.role})
-                data['affected'] = affected_user
+                data["affected"] = affected_user
             else:
-                raise InvalidUserInfo('User not found')
+                raise InvalidUserInfo("User not found")
             if self._next_handler:
                 return super().handle(data)
             else:

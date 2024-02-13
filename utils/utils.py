@@ -24,6 +24,14 @@ def create_response(status: bool, type: str, message: str, data: dict | list = {
     return {"status": status, "type": type, "message": message, "data": data}
 
 def config_loader(config_path: str) -> dict:
+    """loads configs from config.ini
+
+    Args:
+        config_path (str): config file path
+
+    Returns:
+        dict: dictionary of configs
+    """    
     config = ConfigParser()
     config.read(config_path)
     conf_dict = {}

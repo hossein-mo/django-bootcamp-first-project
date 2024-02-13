@@ -10,11 +10,11 @@ from controllers.systems import UserManagement
 
 if __name__ == "__main__":
     root_path = Path(__file__).parent
-    config_path = root_path.joinpath('config.ini')
+    config_path = root_path.joinpath("config.ini")
     config = config_loader(config_path)
     try:
-        log = initialize.run_log_module(**config['logs'])
-        db = initialize.run_db_connection(config['database'])
+        log = initialize.run_log_module(**config["logs"])
+        db = initialize.run_db_connection(config["database"])
     except DatabaseError as err:
         print(f"Problem connecting to database. Check your logs.")
 sys.path.append(os.path.dirname(__file__))

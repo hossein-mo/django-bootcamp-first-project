@@ -1,11 +1,4 @@
-from cgitb import handler
-from lib2to3.fixes.fix_operator import invocation
-import os
-import sys
 from typing import List
-from urllib import response
-
-sys.path.append(os.path.dirname(os.path.dirname(__file__)))
 import controllers.handlers.user_handlers as uHandlers
 import controllers.handlers.account_handlers as baHandlers
 import controllers.handlers.cinema_handlers as cHandlers
@@ -20,10 +13,15 @@ from utils.utils import create_response
 
 
 class UserManagement:
+    """class for user management operations like login, sign up, edit profile, changing password and etc
+
+    Raises:
+        Excs.AuthenticationFaild: if authentication failes
+    """    
     loging: Log
 
     @staticmethod
-    def login(data: dict):
+    def login(data: dict):  
         login_handler = uHandlers.LoginHandler()
         data = login_handler.handle(data)
         user = data["user"]
@@ -172,7 +170,9 @@ class UserManagement:
         return response
 
 
-class AccountManagement:
+class AccountManagement:  
+    """class for account management operations like adding accounts and transfering funds.
+    """   
     loging: Log
 
     @staticmethod
@@ -285,6 +285,8 @@ class AccountManagement:
 
 
 class CinemaManagement:
+    """class for cinema management operation like adding movies, adding theaters and adding shows.
+    """    
     loging: Log
 
     @staticmethod
@@ -435,6 +437,8 @@ class Reports:
 
 
 class Review:
+    """class for review related operations like rating movies and theaters, and writing comments.
+    """
     loging: Log
 
     @staticmethod
@@ -488,6 +492,8 @@ class Review:
 
 
 class OrderManagement:
+    """class for buy and cancel operations like seat reservation and cancelation and buying subscriptions
+    """    
     loging: Log
 
     @staticmethod

@@ -1,10 +1,10 @@
-import os
-import sys
-
-sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(__file__))))
 from utils.utils import create_response
 
 def authorize(authorized_roles: set):
+    """
+    Decorator for authorizing user role
+
+    """ 
     def decorator(func):
         def wrapper(*args, **kwargs):
             user = args[0]

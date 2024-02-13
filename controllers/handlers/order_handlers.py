@@ -1,17 +1,15 @@
-import os
-import sys
-import re
 from datetime import date, datetime, timedelta
-from tabnanny import check
-from typing import Any, Dict, Optional, List
-
-sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(__file__))))
 from controllers.handlers.abstract_handler import AbstractHandler
 from utils.exceptions import NotFound
 from models.models import Subscription, UserSubscription, Order, Showtime
 
 
 class SubCheck(AbstractHandler):
+    """
+    Handler for checking if the requested sub exists or not
+
+    """
+
     def handle(self, data: dict) -> dict | None:
         sub_id = int(data["subs_id"])
         subs = Subscription.fetch_obj(where=f"{Subscription.id} = {sub_id}")
@@ -27,6 +25,11 @@ class SubCheck(AbstractHandler):
 
 
 class BuySub(AbstractHandler):
+    """
+    Handler for buying subscription
+
+    """
+
     def handle(self, data: dict) -> dict | None:
         user = data["user"]
         subs = data["subs"]
@@ -45,6 +48,11 @@ class BuySub(AbstractHandler):
 
 
 class CreateSubInovice(AbstractHandler):
+    """
+    Handler for generating sunscription invoice
+
+    """
+
     def handle(self, data: dict) -> dict | None:
         subs = data["subs"]
         user_sub = data["user_sub"]
@@ -62,6 +70,11 @@ class CreateSubInovice(AbstractHandler):
 
 
 class CalculateDiscountedPrice(AbstractHandler):
+    """
+    Handler for calculating disounted price if exists
+
+    """
+
     def handle(self, data: dict) -> dict | None:
         user = data["user"]
         show_id = int(data["show_id"])
@@ -98,6 +111,11 @@ class CalculateDiscountedPrice(AbstractHandler):
 
 
 class SeatCheck(AbstractHandler):
+    """
+    Handler for checking for seat avalibility
+
+    """
+
     def handle(self, data: dict) -> dict | None:
         show_id = int(data["show_id"])
         data["show_id"] = show_id
@@ -116,6 +134,11 @@ class SeatCheck(AbstractHandler):
 
 
 class ReserveSeat(AbstractHandler):
+    """
+    Handler for reserving seat
+
+    """
+
     def handle(self, data: dict) -> dict | None:
         user = data["user"]
         order = Order(user.id, data["show_id"], data["seat_number"], data["discount"])
@@ -128,6 +151,11 @@ class ReserveSeat(AbstractHandler):
 
 
 class CreateOrderInovice(AbstractHandler):
+    """
+    Handler for generating seat reservation invoice
+
+    """
+
     def handle(self, data: dict) -> dict | None:
         order = data["order"]
         data["inovice"] = {
@@ -144,6 +172,11 @@ class CreateOrderInovice(AbstractHandler):
 
 
 class CalculateCancelationFine(AbstractHandler):
+    """
+    Handler for calculating cancelation fine
+
+    """
+
     def handle(self, data: dict) -> dict | None:
         order_id = int(data["order_id"])
         user = data["user"]
@@ -154,9 +187,9 @@ class CalculateCancelationFine(AbstractHandler):
             raise NotFound("Order not found!")
         order = order[0]
         if order.cancel_date:
-            raise NotFound('Order already canceled!')
+            raise NotFound("Order already canceled!")
         show = Showtime.fetch_obj(where=f'{Showtime.id}="{order.showtime_id}"')[0]
-        data['show'] = show
+        data["show"] = show
         data["order"] = order
         time_now = datetime.now()
         if time_now >= show.start_date:
@@ -173,6 +206,11 @@ class CalculateCancelationFine(AbstractHandler):
 
 
 class CancelOrder(AbstractHandler):
+    """
+    Handler for canceling reservation
+
+    """
+
     def handle(self, data: dict) -> dict | None:
         user = data["user"]
         fine = data["fine"]
@@ -186,6 +224,11 @@ class CancelOrder(AbstractHandler):
 
 
 class CancelInvoice(AbstractHandler):
+    """
+    Handler for generating cancelation invoice
+
+    """
+
     def handle(self, data: dict) -> dict | None:
         user = data["user"]
         fine = data["fine"]
@@ -195,8 +238,8 @@ class CancelInvoice(AbstractHandler):
             "order_id": order.id,
             "show_id": order.showtime_id,
             "fine": fine,
-            "refund_amount": refund['refund_amount'],
-            "paid_price": refund['paid_price'],
+            "refund_amount": refund["refund_amount"],
+            "paid_price": refund["paid_price"],
         }
         if self._next_handler:
             return super().handle(data)

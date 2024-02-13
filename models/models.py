@@ -94,7 +94,7 @@ class User(BaseModel):
 
     @staticmethod
     def authenticate(usercred: Dict[str, str]) -> "User":
-        """_summary_
+        """fetch user object from database if exist
 
         Args:
             username (str): username
@@ -163,7 +163,7 @@ class User(BaseModel):
         role: Union[str, UserRole],
         birth_date: Dict[str, int],
     ) -> "User":
-        """_summary_
+        """registering new user
 
         Args:
             username (str): username

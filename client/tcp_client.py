@@ -10,7 +10,7 @@ class TCPClient:
 
     _instance = None
 
-    def __new__(cls, host: str, port: int, size_length: int = 4) -> 'TCPClient':
+    def __new__(cls, host: str = "localhost", port: int = 8001, size_length: int = 4) -> 'TCPClient':
         if cls._instance is None:
             cls._instance = super().__new__(cls)
             cls._instance.host = host

@@ -41,3 +41,4 @@ class TCPClient:
 
     def close(self):
         self.client_socket.close()
+        TCPClient._instance = None

@@ -38,8 +38,9 @@ class AuthenticationFaild(Exception):
 
 class NotEnoughBalance(Exception):
 
-    def __init__(self) -> None:
+    def __init__(self, message: str = "Not enough balance.") -> None:
         """Exception to raise when balance is not enough"""
+        self.message = message
         super().__init__("Not enough balance.")
 
 
@@ -71,5 +72,15 @@ class MovieNotExist(Exception):
 
 class ShowTimeError(Exception):
     def __init__(self, message: str = "Show overlaps with existing show!") -> None:
+        self.message = message
+        super().__init__(message)
+
+class UnvalidRate(Exception):
+    def __init__(self, message: str = "Rate must be in the range of 1 to 5 star!") -> None:
+        self.message = message
+        super().__init__(message)
+
+class NotFound(Exception):
+    def __init__(self, message: str = "Not Found!") -> None:
         self.message = message
         super().__init__(message)

@@ -1,4 +1,5 @@
 import os
+from re import sub
 import sys
 from datetime import datetime, date
 from mysql.connector import Error as dbError
@@ -39,6 +40,10 @@ class User(BaseModel):
         register_date: datetime,
         last_login: datetime,
         id: Union[int, None] = None,
+        accounts: Union[list, None] = None,
+        subs: Union["Subscription", None] = None,
+        sub_exp: Union[int, str] = None,
+        user_sub: Union["UserSubscription", None] = None,
     ) -> None:
         """Constructor for user model
 
@@ -64,6 +69,10 @@ class User(BaseModel):
         self.last_login = last_login
         self.phone_number = phone_number
         self.balance = balance
+        self.accounts = accounts
+        self.subs = subs
+        self.sub_exp = sub_exp
+        self.user_sub = user_sub
 
     def info(self) -> dict:
         return {
@@ -73,18 +82,19 @@ class User(BaseModel):
             "birth_date": self.birth_date,
             "last_login": self.last_login,
             "register_date": self.register_date,
+            "subs": self.subs.s_name,
+            "subs_expires_in": self.sub_exp,
             "balance": self.balance,
             "role": self.role.value,
         }
 
     def update_last_login(self) -> None:
         """Updated the last login time of the user in database to now"""
-        self.last_login = datetime.now()
-        self.update({User.last_login: self.last_login})
+        self.update({User.last_login: datetime.now()})
 
     @staticmethod
-    def autenthicate(usercred: Dict[str, str]) -> "User":
-        """_summary_
+    def authenticate(usercred: Dict[str, str]) -> "User":
+        """fetch user object from database if exist
 
         Args:
             username (str): username
@@ -95,7 +105,7 @@ class User(BaseModel):
             WrongCredentials: if input password doesn't match the user password
 
         Returns:
-            User: autenthicated user
+            User: authenticate user
         """
         password = hash_password(usercred["password"])
         if "username" in usercred:
@@ -119,6 +129,28 @@ class User(BaseModel):
             User.loging.log_action(
                 f"User logged in with user id = {user.id} username = {user.username} and email = {user.email}"
             )
+            accounts = BankAccount.fetch_obj(where=f"{BankAccount.user_id}={user.id}")
+            user.accounts = {}
+            if accounts:
+                for acc in accounts:
+                    user.accounts[acc.id] = acc
+            user_sub = UserSubscription.fetch_obj(
+                where=f"{UserSubscription.user_id}={user.id} AND {UserSubscription.expire_date} > NOW()"
+            )
+            if user_sub:
+                user.user_sub = user_sub[-1]
+                user_sub = user_sub[-1]
+                subs = Subscription.fetch_obj(
+                    where=f"{Subscription.id} = {user_sub.subscription_id}"
+                )
+                subs = subs[0]
+                sub_exp = (user_sub.expire_date - datetime.now()).days
+            else:
+                sub_exp = "unlimited"
+                subs = Subscription("Bronze", 0, 0, sub_exp, None)
+                user.user_sub = None
+            user.subs = subs
+            user.sub_exp = sub_exp
             return user
 
     @classmethod
@@ -131,7 +163,7 @@ class User(BaseModel):
         role: Union[str, UserRole],
         birth_date: Dict[str, int],
     ) -> "User":
-        """_summary_
+        """registering new user
 
         Args:
             username (str): username
@@ -147,6 +179,8 @@ class User(BaseModel):
         """
         password = hash_password(password)
         rightnow = datetime.now()
+        sub_exp = "unlimited"
+        subs = Subscription("Bronze", 0, 0, duration=sub_exp)
         user = cls(
             username,
             password,
@@ -157,6 +191,8 @@ class User(BaseModel):
             birth_date,
             rightnow,
             rightnow,
+            subs=subs,
+            sub_exp=sub_exp,
         )
         user.insert()
         User.loging.log_action(f"New user registerd. userinfo: {user.info()}")
@@ -207,15 +243,6 @@ class BankAccount(BaseModel):
             "balance": self.balance,
         }
 
-    def update(self):
-        self.update(
-            {
-                BankAccount.card_number: self.card_number,
-                BankAccount.cvv2: self.cvv2,
-                BankAccount.password: self.password,
-            }
-        )
-
     @staticmethod
     def deposit(account: Union[User, "BankAccount"], amount: int) -> None:
         """Add amount to user's balance and update database.
@@ -225,14 +252,12 @@ class BankAccount(BaseModel):
         """
         acc_cls = account.__class__
         account.update({acc_cls.balance: account.balance + amount})
-        account.balance += amount
         return True
 
     @staticmethod
     def withdraw(account: Union[User, "BankAccount"], amount: int) -> None:
         acc_cls = account.__class__
         account.update({acc_cls.balance: account.balance - amount})
-        account.balance -= amount
         return True
 
     @staticmethod
@@ -252,8 +277,8 @@ class BankAccount(BaseModel):
         query1 = origin.update_query({origin_cls.balance: origin.balance - amount})
         query2 = dest.update_query({dest_cls.balance: dest.balance + amount})
         origin_cls.db_obj.transaction([query1, query2])
-        origin.balance -= amount
-        dest.balance += amount
+        origin.balance = origin.balance - amount
+        dest.balance = dest.balance + amount
         return True
 
     @classmethod
@@ -284,19 +309,27 @@ class BankAccount(BaseModel):
 class Subscription(BaseModel):
     name = "subscription"
     id = Column("id", "INT UNSIGNED", primary_key=True, auto_increment=True)
-    s_name = Column("name", "VARCHAR(255)")
+    s_name = Column("s_name", "VARCHAR(255)")
     discount = Column("discount", "SMALLINT UNSIGNED")
     duration = Column("duration", "SMALLINT UNSIGNED")
-    order_number = Column("order_number", "VARCHAR(255)", null=True)
+    order_number = Column("order_number", "SMALLINT UNSIGNED", null=True)
+    price = Column("price", "INT UNSIGNED")
 
     def __init__(
-        self, name, discount, duration=30, order_number=0, id: Union[int, None] = None
+        self,
+        s_name: str,
+        discount: int,
+        price: int,
+        duration: int = 30,
+        order_number: int = None,
+        id: Union[int, None] = None,
     ):
         self.id = id
-        self.name = name
+        self.s_name = s_name
         self.discount = discount
         self.duration = duration
         self.order_number = order_number
+        self.price = price
 
     def set_new_subscription(self):
         self.insert()
@@ -304,7 +337,7 @@ class Subscription(BaseModel):
     def update_subscription(self):
         self.update(
             {
-                Subscription.s_name: self.name,
+                Subscription.s_name: self.s_name,
                 Subscription.discount: self.discount,
                 Subscription.duration: self.duration,
                 Subscription.order_number: self.order_number,
@@ -371,12 +404,10 @@ class MovieRate(BaseModel):
         self,
         user_id,
         movie_id,
-        name: str,
         rate: int,
         id: Union[int, None] = None,
     ) -> None:
         self.id = id
-        self.name = name
         self.rate = rate
         self.user_id = user_id
         self.movie_id = movie_id
@@ -391,17 +422,19 @@ class Comment(BaseModel):
     movie_id = Column(
         "movie_id", "INT UNSIGNED", foreign_key=Movie.id.name, reference=Movie.name
     )
-    parent_id = Column("parent_id", "INT UNSIGNED", foreign_key=id.name, reference=name)
+    parent_id = Column(
+        "parent_id", "INT UNSIGNED", foreign_key=id.name, reference=name, null=True
+    )
     text = Column("text", "TEXT")
-    created_at = Column("created_at", "DATE")
+    created_at = Column("created_at", "DATETIME")
 
     def __init__(
         self,
-        user_id,
-        movie_id,
-        parent_id,
-        text,
-        created_at=datetime.now(),
+        user_id: int,
+        movie_id: int,
+        parent_id: int,
+        text: str,
+        created_at: datetime,
         id: Union[int, None] = None,
     ):
         self.id = id
@@ -410,23 +443,34 @@ class Comment(BaseModel):
         self.parent_id = parent_id
         self.text = text
         self.created_at = created_at
-        self.replies = []
 
     @staticmethod
-    def comment(user_id, movie_id, parent_id, text) -> None:
-        Comment(None, user_id, movie_id, parent_id, text).insert()
+    def create_new(user_id: int, movie_id: int, parent_id: int, text: str) -> None:
+        comm = Comment(user_id, movie_id, parent_id, text, datetime.now())
+        comm.insert()
+        return comm
 
     @staticmethod
     def get_comments(movie_id) -> list["Comment"]:
         result = []
-        comments = Comment.fetch_obj(f"{Comment.movie_id} = {movie_id}")
-        for i in range(len(comments)):
-            if comments[i].parent_id == 0:
-                result.append(comments[i])
-            for j in range(i + 1, len(comments)):
-                if comments[j].parent_id == comments[i].id:
-                    comments[i].replies.append(comments[j])
-        return result
+        query = f"""
+                WITH RECURSIVE CommentTree AS (
+                SELECT c.*, CAST(c.id AS CHAR(200)) AS path
+                FROM comment c
+                WHERE c.parent_id IS NULL AND c.movie_id = {movie_id}
+
+                UNION ALL
+
+                SELECT c2.*, CONCAT(ct.path, '/', CAST(c2.id AS CHAR(200)))
+                FROM comment c2
+                INNER JOIN CommentTree ct ON c2.parent_id = ct.id
+                )
+                SELECT id, user_id, movie_id, parent_id, text, created_at, LENGTH(path) - LENGTH(REPLACE(path, '/', '')) AS depth
+                FROM CommentTree
+                ORDER BY path;
+                """
+        comments = Comment.db_obj.fetch(query)
+        return comments
 
 
 class UserSubscription(BaseModel):
@@ -443,6 +487,20 @@ class UserSubscription(BaseModel):
     )
     buy_date = Column("buy_date", "DATETIME")
     expire_date = Column("expire_date", "DATETIME")
+
+    def __init__(
+        self,
+        user_id: int,
+        subscription_id: int,
+        buy_date: datetime,
+        expire_date: datetime,
+        id: int = None,
+    ) -> None:
+        self.id = id
+        self.user_id = user_id
+        self.subscription_id = subscription_id
+        self.buy_date = buy_date
+        self.expire_date = expire_date
 
     @staticmethod
     def set_user_subscription(user, subscription):
@@ -524,12 +582,10 @@ class TheaterRate(BaseModel):
         self,
         user_id,
         theater_id,
-        name: str,
         rate: int,
         id: Union[int, None] = None,
     ) -> None:
         self.id = id
-        self.name = name
         self.rate = rate
         self.user_id = user_id
         self.theater_id = theater_id
@@ -592,15 +648,16 @@ class Showtime(BaseModel):
             }
         )
 
-    def get_reserved_seat(self) -> list[int]:
+    @staticmethod
+    def get_reserved_seat(show_id: int) -> list[int]:
         """Returns reserved seat numbers of given show
 
         Returns:
             list: List of reserved seat number
         """
-        results = Showtime.fetch(
-            select=Order.seat_number.name,
-            where=f"{Order.showtime_id.name} = {self.id} AND {Order.cancel_date.name} IS NULL",
+        results = Order.fetch(
+            select=(Order.seat_number.name,),
+            where=f"{Order.showtime_id} = {show_id} AND {Order.cancel_date} IS NULL",
         )
         return [d[Order.seat_number.name] for d in results]
 
@@ -686,7 +743,7 @@ class Order(BaseModel):
         showtime_id,
         seat_number,
         discount,
-        create_date=datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+        create_date=datetime.now(),
         cancel_date: Union[str, None] = None,
         id: Union[int, None] = None,
     ):
@@ -698,10 +755,7 @@ class Order(BaseModel):
         self.create_date = create_date
         self.cancel_date = cancel_date
 
-    def reserve(self):
-        self.insert()
-
-    def cancel_order(self, user: User, fine: int) -> None:
+    def cancel_order(self, user: User, fine: int) -> int:
         """updates 'user' table set 'balance' ->  increase the balance equal to ticket price minus the fine
         and 'order' table set 'cancel_date' -> now.
 
@@ -710,28 +764,43 @@ class Order(BaseModel):
             fine (int): based on the time remaining until the start of the show
 
         Returns:
-            None
+            int: refunded amount
         """
         showtime_price = Showtime.fetch(
-            select=f"{Showtime.price}", where=f"{Showtime.id} = {self.showtime_id}"
+            select=(Showtime.price.name,), where=f"{Showtime.id} = {self.showtime_id}"
         )[0][Showtime.price.name]
         current_date = datetime.now()
-        formatted_date = current_date.strftime("%Y-%m-%d %H:%M:%S")
+        paid_price = int(showtime_price * ((100-self.discount)/100))
+        refund_amount = int(paid_price * ((100 - fine) / 100))
         query1 = user.update_query(
-            {User.balance: user.balance + showtime_price * ((100 - fine) / 100)}
+            {User.balance: user.balance + refund_amount}
         )
-        query2 = self.update_query({Order.cancel_date: formatted_date})
-        try:
-            self.db_obj.transaction([query1, query2])
-        except dbError as err:
-            print(f'Error while updating rows in "{self.name}" or "{user.name}.')
-            print(f"Error description: {err}")
+        query2 = self.update_query({Order.cancel_date: current_date})
+        self.db_obj.transaction([query1, query2])
+        user.balance += refund_amount
+        return {'refund_amount': refund_amount, 'paid_price': paid_price}
 
     @classmethod
-    def get_user_orders(cls, user):
-        results = Order.fetch_obj(
+    def get_user_orders(cls, user: User) -> list:
+        """list of user orders
+
+        Args:
+            user (User): user
+
+        Returns:
+            list: list of user orders
+        """             
+        results = Order.fetch(
+            select=(
+                Order.id.name,
+                Order.showtime_id.name,
+                Order.seat_number.name,
+                Order.discount.name,
+                Order.create_date.name,
+                Order.cancel_date.name,
+            ),
             where=f"{Order.user_id.name} = {user.id}",
-            order_by={Order.create_date.name},
+            order_by=f"{Order.create_date.name}",
             descending=True,
         )
         return results

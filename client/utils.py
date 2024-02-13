@@ -1,12 +1,24 @@
 import os
 
 def create_request(type: str, subtype: str = '', data: dict = {}) -> dict:
+    """creates request dictionary
+
+    Args:
+        type (str): type of request
+        subtype (str, optional): subtype of request. Defaults to ''.
+        data (dict, optional): data . Defaults to {}.
+
+    Returns:
+        dict: request dictionary to send with socket
+    """    
     if subtype:
         return {"type": type, 'subtype': subtype, "data": data}
     else:
         return {"type": type, "data": data}
     
 def clear_screen():
+    """clear terminal screen
+    """    
     os.system('cls' if os.name == 'nt' else 'clear')
 
     

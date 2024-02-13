@@ -257,7 +257,9 @@ class BaseModel:
                 v = obj_dict[column.name].value
             else:
                 v = obj_dict[column.name]
-            if column.as_string:
+            if v == None:
+                values = f'{values}NULL,'
+            elif column.as_string:
                 values = f'{values}"{v}",'
             else:
                 values = f"{values}{v},"
@@ -306,7 +308,7 @@ class BaseModel:
         Returns:
             str: query for updating
         """
-        query = f"UPDATE {self.name} SET"
+        query = f"UPDATE `{self.name}` SET"
         for column in colval:
             query = f'{query} {column.name} = "{colval[column]}",'
         query = f"{query[:-1]} WHERE"

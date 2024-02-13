@@ -2,7 +2,7 @@ import os
 import sys
 sys.path.append(os.path.dirname(os.path.dirname(__file__)))
 
-from .utils import create_request, Page, clear_screen, Response, CinemaReservationApp
+from utils import create_request, Page, clear_screen, Response, CinemaReservationApp
 from user import User, ProfilePage
 from datetime import datetime
 from getpass import getpass

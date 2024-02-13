@@ -10,7 +10,7 @@ def clear_screen():
     os.system('cls' if os.name == 'nt' else 'clear')
 
     
-class Response():
+class Response:
     def __init__(self, status, type, message, data):
         self.status = status
         self.type = type
@@ -35,14 +35,14 @@ class CinemaReservationApp:
         else:
             print("Cannot navigate back. Already at the home page.")
 
-    def start(self):
-        self.navigate_to_page(HomePage())
-        while True:
-            user_input = input("Enter your choice: ")
-            if user_input == "0":
-                self.navigate_back()
-            else:
-                self.current_page.handle_input(user_input, self)
+    def start(self, home_page):
+        self.navigate_to_page(home_page)
+        # while True:
+        #     user_input = input("Enter your choice: ")
+        #     if user_input == "0":
+        #         self.navigate_back()
+        #     else:
+        #         self.current_page.handle_input(user_input, self)
 
 
 from abc import ABC, abstractmethod

@@ -2,6 +2,7 @@ import os
 import sys
 import re
 from datetime import date, datetime, timedelta
+from tabnanny import check
 from typing import Any, Dict, Optional, List
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(__file__))))
@@ -35,6 +36,7 @@ class BuySub(AbstractHandler):
         user_sub.insert()
         user.subs = subs
         user.sub_exp = subs.duration
+        user.user_sub = user_sub
         data["user_sub"] = user_sub
         if self._next_handler:
             return super().handle(data)
@@ -52,6 +54,149 @@ class CreateSubInovice(AbstractHandler):
             "duration": subs.duration,
             "expire_date": user_sub.expire_date,
             "price": data["amount"],
+        }
+        if self._next_handler:
+            return super().handle(data)
+        else:
+            return data
+
+
+class CalculateDiscountedPrice(AbstractHandler):
+    def handle(self, data: dict) -> dict | None:
+        user = data["user"]
+        show_id = int(data["show_id"])
+        show = Showtime.fetch_obj(where=f"{Showtime.id} = {show_id}")
+        if not show:
+            raise NotFound("Requested show not found")
+        show = show[0]
+        today = date.today()
+        if today.month == user.birth_date.month and today.dat == user.birth_date.day:
+            discount = 50
+        elif user.user_sub:
+            if user.user_sub.expire_date > datetime.now():
+                if user.subs.order_number:
+                    orders_with_discount = Order.fetch(
+                        where=f'{Order.user_id} = "{user.id}" AND '
+                        + f'{Order.create_date} > "{user.user_sub.buy_date}" '
+                        + f'AND {Order.discount} = "{user.subs.discount}"'
+                    )
+                    if len(orders_with_discount) >= user.subs.order_number:
+                        discount = 0
+                    else:
+                        discount = user.subs.discount
+                else:
+                    discount = user.subs.discount
+        price = int(show.price * (1 - (discount / 100)))
+        data["amount"] = price
+        data["price"] = price
+        data["discount"] = discount
+        data["pre_invoice"] = {"price": price, "discount": discount}
+        if self._next_handler:
+            return super().handle(data)
+        else:
+            return data
+
+
+class SeatCheck(AbstractHandler):
+    def handle(self, data: dict) -> dict | None:
+        show_id = int(data["show_id"])
+        data["show_id"] = show_id
+        seat_number = int(data["seat_number"])
+        data["seat_number"] = seat_number
+        check_seat = Order.fetch(
+            where=f'{Order.showtime_id} = "{show_id}" '
+            + f'AND {Order.seat_number} = "{seat_number}"'
+        )
+        if check_seat:
+            raise NotFound("Requested seat is already reserved by someone else.")
+        if self._next_handler:
+            return super().handle(data)
+        else:
+            return data
+
+
+class ReserveSeat(AbstractHandler):
+    def handle(self, data: dict) -> dict | None:
+        user = data["user"]
+        order = Order(user.id, data["show_id"], data["seat_number"], data["discount"])
+        order.insert()
+        data["order"] = order
+        if self._next_handler:
+            return super().handle(data)
+        else:
+            return data
+
+
+class CreateOrderInovice(AbstractHandler):
+    def handle(self, data: dict) -> dict | None:
+        order = data["order"]
+        data["inovice"] = {
+            "order_id": order.id,
+            "show_id": order.showtime_id,
+            "seat_number": order.seat_number,
+            "discount": order.discount,
+            "price": data["price"],
+        }
+        if self._next_handler:
+            return super().handle(data)
+        else:
+            return data
+
+
+class CalculateCancelationFine(AbstractHandler):
+    def handle(self, data: dict) -> dict | None:
+        order_id = int(data["order_id"])
+        user = data["user"]
+        order = Order.fetch_obj(
+            where=f'{Order.id} = "{order_id}" AND {Order.user_id} = "{user.id}"'
+        )
+        if not order:
+            raise NotFound("Order not found!")
+        order = order[0]
+        if order.cancel_date:
+            raise NotFound('Order already canceled!')
+        show = Showtime.fetch_obj(where=f'{Showtime.id}="{order.showtime_id}"')[0]
+        data['show'] = show
+        data["order"] = order
+        time_now = datetime.now()
+        if time_now >= show.start_date:
+            fine = 100
+        elif (show.start_date - time_now).total_seconds() < 3600:
+            fine = 18
+        else:
+            fine = 0
+        data["fine"] = fine
+        if self._next_handler:
+            return super().handle(data)
+        else:
+            return data
+
+
+class CancelOrder(AbstractHandler):
+    def handle(self, data: dict) -> dict | None:
+        user = data["user"]
+        fine = data["fine"]
+        order = data["order"]
+        refund = order.cancel_order(user, fine)
+        data["refund"] = refund
+        if self._next_handler:
+            return super().handle(data)
+        else:
+            return data
+
+
+class CancelInvoice(AbstractHandler):
+    def handle(self, data: dict) -> dict | None:
+        user = data["user"]
+        fine = data["fine"]
+        order = data["order"]
+        refund = data["refund"]
+        data["inovice"] = {
+            "order_id": order.id,
+            "show_id": order.showtime_id,
+            "fine": fine,
+            "refund_amount": refund['refund_amount'],
+            "paid_price": refund['paid_price'],
         }
         if self._next_handler:
             return super().handle(data)

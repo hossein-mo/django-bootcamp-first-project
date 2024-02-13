@@ -43,6 +43,7 @@ class User(BaseModel):
         accounts: Union[list, None] = None,
         subs: Union["Subscription", None] = None,
         sub_exp: Union[int, str] = None,
+        user_sub: Union["UserSubscription", None] = None,
     ) -> None:
         """Constructor for user model
 
@@ -71,6 +72,7 @@ class User(BaseModel):
         self.accounts = accounts
         self.subs = subs
         self.sub_exp = sub_exp
+        self.user_sub = user_sub
 
     def info(self) -> dict:
         return {
@@ -136,6 +138,7 @@ class User(BaseModel):
                 where=f"{UserSubscription.user_id}={user.id} AND {UserSubscription.expire_date} > NOW()"
             )
             if user_sub:
+                user.user_sub = user_sub[-1]
                 user_sub = user_sub[-1]
                 subs = Subscription.fetch_obj(
                     where=f"{Subscription.id} = {user_sub.subscription_id}"
@@ -145,6 +148,7 @@ class User(BaseModel):
             else:
                 sub_exp = "unlimited"
                 subs = Subscription("Bronze", 0, 0, sub_exp, None)
+                user.user_sub = None
             user.subs = subs
             user.sub_exp = sub_exp
             return user
@@ -308,7 +312,7 @@ class Subscription(BaseModel):
     s_name = Column("s_name", "VARCHAR(255)")
     discount = Column("discount", "SMALLINT UNSIGNED")
     duration = Column("duration", "SMALLINT UNSIGNED")
-    order_number = Column("order_number", "VARCHAR(255)", null=True)
+    order_number = Column("order_number", "SMALLINT UNSIGNED", null=True)
     price = Column("price", "INT UNSIGNED")
 
     def __init__(
@@ -316,8 +320,8 @@ class Subscription(BaseModel):
         s_name: str,
         discount: int,
         price: int,
-        duration=30,
-        order_number=0,
+        duration: int = 30,
+        order_number: int = None,
         id: Union[int, None] = None,
     ):
         self.id = id
@@ -739,7 +743,7 @@ class Order(BaseModel):
         showtime_id,
         seat_number,
         discount,
-        create_date=datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+        create_date=datetime.now(),
         cancel_date: Union[str, None] = None,
         id: Union[int, None] = None,
     ):
@@ -751,10 +755,7 @@ class Order(BaseModel):
         self.create_date = create_date
         self.cancel_date = cancel_date
 
-    def reserve(self):
-        self.insert()
-
-    def cancel_order(self, user: User, fine: int) -> None:
+    def cancel_order(self, user: User, fine: int) -> int:
         """updates 'user' table set 'balance' ->  increase the balance equal to ticket price minus the fine
         and 'order' table set 'cancel_date' -> now.
 
@@ -763,28 +764,43 @@ class Order(BaseModel):
             fine (int): based on the time remaining until the start of the show
 
         Returns:
-            None
+            int: refunded amount
         """
         showtime_price = Showtime.fetch(
-            select=f"{Showtime.price}", where=f"{Showtime.id} = {self.showtime_id}"
+            select=(Showtime.price.name,), where=f"{Showtime.id} = {self.showtime_id}"
         )[0][Showtime.price.name]
         current_date = datetime.now()
-        formatted_date = current_date.strftime("%Y-%m-%d %H:%M:%S")
+        paid_price = int(showtime_price * ((100-self.discount)/100))
+        refund_amount = int(paid_price * ((100 - fine) / 100))
         query1 = user.update_query(
-            {User.balance: user.balance + showtime_price * ((100 - fine) / 100)}
+            {User.balance: user.balance + refund_amount}
         )
-        query2 = self.update_query({Order.cancel_date: formatted_date})
-        try:
-            self.db_obj.transaction([query1, query2])
-        except dbError as err:
-            print(f'Error while updating rows in "{self.name}" or "{user.name}.')
-            print(f"Error description: {err}")
+        query2 = self.update_query({Order.cancel_date: current_date})
+        self.db_obj.transaction([query1, query2])
+        user.balance += refund_amount
+        return {'refund_amount': refund_amount, 'paid_price': paid_price}
 
     @classmethod
-    def get_user_orders(cls, user):
-        results = Order.fetch_obj(
+    def get_user_orders(cls, user: User) -> list:
+        """list of user orders
+
+        Args:
+            user (User): user
+
+        Returns:
+            list: list of user orders
+        """             
+        results = Order.fetch(
+            select=(
+                Order.id.name,
+                Order.showtime_id.name,
+                Order.seat_number.name,
+                Order.discount.name,
+                Order.create_date.name,
+                Order.cancel_date.name,
+            ),
             where=f"{Order.user_id.name} = {user.id}",
-            order_by={Order.create_date.name},
+            order_by=f"{Order.create_date.name}",
             descending=True,
         )
         return results

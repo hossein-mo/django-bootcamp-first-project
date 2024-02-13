@@ -1,4 +1,5 @@
 from cgitb import handler
+from lib2to3.fixes.fix_operator import invocation
 import os
 import sys
 from typing import List
@@ -375,6 +376,8 @@ class Reports:
             response = Reports.get_seats(user, data)
         elif request["subtype"] == "getsubs":
             response = Reports.get_subs(user)
+        elif request["subtype"] == "getorders":
+            response = Reports.get_user_orders(user)
         else:
             raise Excs.InvalidRequest
         return response
@@ -422,6 +425,12 @@ class Reports:
     def get_subs(user: mod.User):
         subs = mod.Subscription.fetch()
         response = create_response(True, "report", "List of reserved seats!", data=subs)
+        return response
+
+    @staticmethod
+    def get_user_orders(user: mod.User):
+        data = mod.Order.get_user_orders(user)
+        response = create_response(True, "report", "List of user orders!", data=data)
         return response
 
 
@@ -487,6 +496,14 @@ class OrderManagement:
             data = request["data"]
         if request["subtype"] == "subs":
             response = OrderManagement.order_subs(user, data)
+        elif request["subtype"] == "pre_invoice":
+            response = OrderManagement.ticket_pre_invoice(user, data)
+        elif request["subtype"] == "reserve":
+            response = OrderManagement.reserve_seat(user, data)
+        elif request["subtype"] == "cancel":
+            response = OrderManagement.cancel_reservation(user, data)
+        else:
+            raise Excs.InvalidRequest
         return response
 
     @staticmethod
@@ -499,11 +516,73 @@ class OrderManagement:
         transf = baHandlers.TransferHandler()
         buy_sub = oHandlers.BuySub()
         inovice = oHandlers.CreateSubInovice()
-        handler.set_next(balance_check).set_next(transf).set_next(buy_sub).set_next(inovice)
+        handler.set_next(balance_check).set_next(transf).set_next(buy_sub).set_next(
+            inovice
+        )
         try:
             data = handler.handle(data)
-            response = create_response(True, 'order', 'Order successful!', data=data['inovice'])
+            response = create_response(
+                True, "order", "Order successful!", data=data["inovice"]
+            )
+            OrderManagement.loging.log_transaction(
+                f"User bought a {user.subs.s_name} subscription, username: {user.name}"
+            )
         except (Excs.NotFound, Excs.NotEnoughBalance) as err:
-            response = create_response(False, 'order', err.message)
+            response = create_response(False, "order", err.message)
         return response
-    
+
+    def ticket_pre_invoice(user: mod.User, data: dict) -> dict:
+        data["user"] = user
+        handler = oHandlers.CalculateDiscountedPrice()
+        try:
+            data = handler.handle(data)
+        except Excs.NotFound as err:
+            response = create_response(False, "invoice", err.message)
+        response = create_response(True, "invoice", "", data=data["pre_invoice"])
+        return response
+
+    def reserve_seat(user: mod.User, data: dict) -> dict:
+        data["user"] = user
+        data["dest"] = "withdraw"
+        data["origin"] = user
+        handler = oHandlers.CalculateDiscountedPrice()
+        seat_check = oHandlers.SeatCheck()
+        balance_check = baHandlers.BalanceCheck()
+        transf = baHandlers.TransferHandler()
+        reserve = oHandlers.ReserveSeat()
+        invoice = oHandlers.CreateOrderInovice()
+        handler.set_next(seat_check).set_next(balance_check).set_next(transf).set_next(
+            reserve
+        ).set_next(invoice)
+        try:
+            data = handler.handle(data)
+            order = data["order"]
+            response = create_response(
+                True, "order", "Order successful!", data=data["inovice"]
+            )
+            OrderManagement.loging.log_transaction(
+                f"User reserved seat number {order.seat_number} for show id {order.showtime_id}, username: {user.name}"
+            )
+        except (Excs.NotFound, Excs.NotEnoughBalance) as err:
+            response = create_response(False, "order", err.message)
+
+        return response
+
+    def cancel_reservation(user: mod.User, data: dict) -> dict:
+        data["user"] = user
+        handler = oHandlers.CalculateCancelationFine()
+        cancel = oHandlers.CancelOrder()
+        invoice = oHandlers.CancelInvoice()
+        handler.set_next(cancel).set_next(invoice)
+        try:
+            data = handler.handle(data)
+            response = create_response(
+                True, "order", "Order canceld!", data=data["inovice"]
+            )
+            OrderManagement.loging.log_transaction(
+                f"User canceld reservation, user id: {user.id} username: {user.name}. "
+                + f'Cancellation info: {data["inovice"]}'
+            )
+        except Excs.NotFound as err:
+            response = create_response(False, "order", err.message)
+        return response

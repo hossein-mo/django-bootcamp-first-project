@@ -8,7 +8,7 @@ from typing import Tuple
 sys.path.append(os.path.dirname(os.path.dirname(__file__)))
 
 from utils.utils import create_response
-from utils.exceptions import DatabaseError
+from utils.exceptions import DatabaseError, InvalidRequest
 from controllers.systems import (
     OrderManagement,
     UserManagement,
@@ -97,7 +97,7 @@ class TCPServer:
                         "user",
                         "We had a problem processing your request. Please try again later.",
                     )
-                except (KeyError, TypeError, ValueError) as err:
+                except (KeyError, TypeError, ValueError, InvalidRequest) as err:
                     print(err)
                     response = create_response(False, "user", "Invalid request.")
                 TCPServer.socket_send(client_socket, response, size_length)

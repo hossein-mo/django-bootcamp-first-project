@@ -308,7 +308,7 @@ class BaseModel:
         Returns:
             str: query for updating
         """
-        query = f"UPDATE {self.name} SET"
+        query = f"UPDATE `{self.name}` SET"
         for column in colval:
             query = f'{query} {column.name} = "{colval[column]}",'
         query = f"{query[:-1]} WHERE"

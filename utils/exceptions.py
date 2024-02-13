@@ -79,3 +79,8 @@ class UnvalidRate(Exception):
     def __init__(self, message: str = "Rate must be in the range of 1 to 5 star!") -> None:
         self.message = message
         super().__init__(message)
+
+class NotFound(Exception):
+    def __init__(self, message: str = "Not Found!") -> None:
+        self.message = message
+        super().__init__(message)

@@ -10,6 +10,7 @@ sys.path.append(os.path.dirname(os.path.dirname(__file__)))
 from utils.utils import create_response
 from utils.exceptions import DatabaseError
 from controllers.systems import (
+    OrderManagement,
     UserManagement,
     AccountManagement,
     CinemaManagement,
@@ -86,6 +87,8 @@ class TCPServer:
                         response = Reports.process(user, request)
                     elif request["type"] == 'review':
                         response = Review.process(user, request)
+                    elif request["type"] == 'order':
+                        response = OrderManagement.process(user, request)
                     else:
                         response = create_response(False, "user", "Invalid request.")
                 except DatabaseError as err:

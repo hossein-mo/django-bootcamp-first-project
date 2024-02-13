@@ -136,11 +136,11 @@ class User(BaseModel):
                 where=f"{UserSubscription.user_id}={user.id} AND {UserSubscription.expire_date} > NOW()"
             )
             if user_sub:
-                user_sub = user_sub[0]
+                user_sub = user_sub[-1]
                 subs = Subscription.fetch_obj(
                     where=f"{Subscription.id} = {user_sub.subscription_id}"
                 )
-                subs = sub[0]
+                subs = subs[0]
                 sub_exp = (user_sub.expire_date - datetime.now()).days
             else:
                 sub_exp = "unlimited"
@@ -247,13 +247,13 @@ class BankAccount(BaseModel):
             amount (int): amount to deposit
         """
         acc_cls = account.__class__
-        print(account.update({acc_cls.balance: account.balance + amount}))
+        account.update({acc_cls.balance: account.balance + amount})
         return True
 
     @staticmethod
     def withdraw(account: Union[User, "BankAccount"], amount: int) -> None:
         acc_cls = account.__class__
-        print(account.update({acc_cls.balance: account.balance - amount}))
+        account.update({acc_cls.balance: account.balance - amount})
         return True
 
     @staticmethod

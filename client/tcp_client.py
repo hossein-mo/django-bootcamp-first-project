@@ -9,7 +9,6 @@ class TCPClient:
     client_socket: socket.socket
 
     _instance = None
-
     def __new__(cls, host: str = 'localhost', port: int = 8000, size_length: int = 4) -> 'TCPClient':
         
         """creates a socket connecton to specified host and port

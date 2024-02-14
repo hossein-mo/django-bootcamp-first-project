@@ -70,7 +70,7 @@ class UserManagement:
             )
         except Excs.InvalidUserInfo as err:
             response = create_response(False, "user", err.message)
-        except Excs.PasswordPolicyNotPassed:
+        except Excs.PasswordPolicyNotPassed as err:
             response = create_response(False, "user", err.message)
         except Excs.DuplicatedEntry as err:
             response = create_response(False, "user", "Username or email are in use!")

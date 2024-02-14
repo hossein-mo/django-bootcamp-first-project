@@ -19,12 +19,13 @@ class LoginPage(Page):
         response = Response(**response)
         if response is not None:
             if response.status:
-                user = response.data['userinfo']
+                print(response.data)
+                user = response.data
                 user = User(**user)
                 self.app.navigate_to_page(ProfilePage(self.app, user))
             else:
                 client.close()
-                print("Connection Error! try again...")
+                print(response.message)
                 input("Press any key to go back... ")
                 self.handle_input("0")
         else:
@@ -68,12 +69,13 @@ class SignUpPage(Page):
         response = Response(**response)
         if response is not None:
             if response.status:
-                user = response.data['userinfo']
+                print(response.data)
+                user = response.data
                 user = User(**user)
                 self.app.navigate_to_page(ProfilePage(self.app, user))
             else:
                 client.close()
-                print("Connection Error! try again...")
+                print(response.message)
                 input("Press any key to go back... ")
                 self.handle_input("0")
         else:
@@ -91,7 +93,6 @@ class SignUpPage(Page):
             self.user.username = input("Username:")
             self.handle_input(self.user.username)
             if self.user.is_valid_username():
-                print("\033[92mOK! \033[0m")
                 break
             else:
                 print("\033[91mThe username format is incorrect, please try again (Format: A-Z a-z 0-9).\033[0m")
@@ -101,7 +102,6 @@ class SignUpPage(Page):
             self.user.email = input("Email:")
             self.handle_input(self.user.email)
             if self.user.is_valid_email():
-                print("\033[92mOK! \033[0m")
                 break
             else:
                 print("\033[91mThe email format is incorrect, please try again\033[0m")
@@ -111,7 +111,6 @@ class SignUpPage(Page):
             self.user.phone = input("Contact Number (Optional):")
             self.handle_input(self.user.phone)
             if self.user.is_valid_phone():
-                print("\033[92mOK! \033[0m")
                 break
             else:
                 print("\033[91mThe PhoneNumber is invalid. please try again.\033[0m")
@@ -121,7 +120,7 @@ class SignUpPage(Page):
             self.user.password = getpass(prompt="Password (Password must be at least 8 characters long and contain at least two @#$& characters): ")
             self.handle_input(self.user.password)
             if self.user.is_valid_password(self.user.password):
-                print("\033[92mOK!\033[0m")
+                # print("\033[92mOK!\033[0m")
                 break
             else:
                 print("\033[91mThe password is invalid, please try again.\033[0m")
@@ -131,7 +130,6 @@ class SignUpPage(Page):
             self.user.birthdate = input("Enter your birthdate (Year-Month-Day): ")
             self.handle_input(self.user.birthdate)
             if self.user.validate_date_format() is not False:
-                print("\033[92mOK! \033[0m")
                 break
             else:
                 print("\033[91mInvalid date format. please try again.\033[0m")

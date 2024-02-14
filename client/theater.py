@@ -84,3 +84,9 @@ class TheaterSeatsPage(Page):
             print("Connection Error! try again...")
             input("Press any key to go back... ")
             self.handle_input("0")
+
+
+class TheaterListPage(Page):
+
+    def display(self):
+        pass

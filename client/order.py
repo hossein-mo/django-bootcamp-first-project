@@ -29,12 +29,16 @@ class UserOrdersPage(Page):
             if response is not None:
                 if response.status:
                     UserOrdersPage.order_list = response.data
-                    for i in range(self.order_list):
-                        order = Order(**self.order_list[i])
-                        print(f'{i+1}. showtime: {order.showtime_id}, seat number: {order.seat_number}', end='')
-                        if order.cancel_date is not None:
-                            print(f', cancel date: {order.cancel_date}' if order.cancel_date is not None else '')
-                    print(f'\n1. cancel ticket\n press any else key to go back...')
+                    if len(self.order_list)==0:
+                        print('No order yet!?\n')
+                        print(f'\npress any else key to go back...')
+                    else:
+                        for i in range(len(self.order_list)):
+                            order = Order(**self.order_list[i])
+                            print(f'{i+1}. showtime: {order.showtime_id}, seat number: {order.seat_number}', end='')
+                            if order.cancel_date is not None:
+                                print(f', cancel date: {order.cancel_date}' if order.cancel_date is not None else '')
+                        print(f'\n1. cancel ticket\n press any else key to go back...')
                     self.handle_input(input())
                 else:
                     print("Connection Error! try again...")
@@ -54,7 +58,7 @@ class UserOrdersPage(Page):
             self.handle_input(input())
         
     def handle_input(self, user_input):
-        if user_input == "1":
+        if len(self.order_list) > 0 and user_input == "1":
             self.app.navigate_to_page(CancelOrderPage(self.app, self.order_list))
         else:
             self.app.navigate_back()

@@ -59,11 +59,15 @@ class AccountListPage(Page):
             response = Response(**response)
             if response is not None:
                 if response.status:
-                    AccountListPage.account_list = response.data['accounts']
-                    for account in self.account_list:
-                        account = BankAccount(**account)
-                        print(f'name: {account.name} card number: {account.card_number} balance: {account.balance}')
-                    print(f'\n1. deposite\n2. withdraw\n3. transfer\n press any else key to go back...')
+                    AccountListPage.account_list = response.data
+                    if len(self.account_list)==0:
+                        print('No account register yet!\n')
+                        print(f'1. create account\npress any else key to go back...')
+                    else:
+                        for account in self.account_list:
+                            account = BankAccount(**account)
+                            print(f'name: {account.name} card number: {account.card_number} balance: {account.balance}')
+                        print(f'\n1. create account \n2 deposite\n3. withdraw\n4. transfer\n press any else key to go back...')
                     self.handle_input(input())
                 else:
                     print("Connection Error! try again...")
@@ -77,16 +81,18 @@ class AccountListPage(Page):
             for account in self.account_list:
                 account = BankAccount(**account)
                 print(f'name: {account.name} card number: {account.card_number} balance: {account.balance}')
-            print(f'\n1. deposite\n2. withdraw\n3. transfer\n press any else key to go back...')
+            print(f'\n1. create account \n2 deposite\n3. withdraw\n4. transfer\n press any else key to go back...')
             self.handle_input(input())
 
         
     def handle_input(self, user_input):
         if user_input == "1":
+            self.app.navigate_to_page(CreationPage(self.app))
+        elif len(self.account_list) > 0 and user_input == "2":
             self.app.navigate_to_page(DepositPage(self.app, self.account_list))
-        elif user_input == "2":
+        elif len(self.account_list) > 0 and user_input == "3":
             self.app.navigate_to_page(WithdrawPage(self.app, self.account_list))
-        elif user_input == "3":
+        elif len(self.account_list) != 0 and user_input == "4":
             self.app.navigate_to_page(TransferPage(self.app, self.account_list))
         else:
             self.app.navigate_back()

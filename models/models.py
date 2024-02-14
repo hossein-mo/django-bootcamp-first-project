@@ -795,7 +795,7 @@ class Order(BaseModel):
             o.{Order.create_date} buy_date,
             s.{Showtime.price},
             o.{Order.discount},
-            s.{Showtime.price}*(100-o.{Order.discount})/100 paied_price
+            FLOOR(s.{Showtime.price}*(100-o.{Order.discount})/100) paied_price
             FROM
             `{Order.name}` o
             LEFT JOIN {Showtime.name} s ON s.{Showtime.id} = o.{Order.showtime_id}
@@ -804,6 +804,5 @@ class Order(BaseModel):
             WHERE
             o.{Order.user_id} = "{user.id}" AND s.{Showtime.start_date} > NOW()
             """
-        print(query)
         results = Order.db_obj.fetch(query)
         return results

@@ -792,9 +792,10 @@ class Order(BaseModel):
             s.{Showtime.start_date} show_start_date,
             s.{Showtime.end_date} show_end_date,
             o.{Order.seat_number},
-            o.{Order.create_date} buy_date,
             s.{Showtime.price},
             o.{Order.discount},
+            o.{Order.create_date} buy_date,
+            o.{Order.cancel_date},
             FLOOR(s.{Showtime.price}*(100-o.{Order.discount})/100) paied_price
             FROM
             `{Order.name}` o

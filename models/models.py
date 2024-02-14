@@ -448,17 +448,17 @@ class Comment(BaseModel):
         result = []
         query = f"""
                 WITH RECURSIVE CommentTree AS (
-                SELECT c.*, CAST(c.id AS CHAR(200)) AS path
-                FROM comment c
-                WHERE c.parent_id IS NULL AND c.movie_id = {movie_id}
+                SELECT c.*, CAST(c.{Comment.id} AS CHAR(200)) AS path
+                FROM {Comment.name} c
+                WHERE c.{Comment.parent_id} IS NULL AND c.{Comment.movie_id} = "{movie_id}"
 
                 UNION ALL
 
                 SELECT c2.*, CONCAT(ct.path, '/', CAST(c2.id AS CHAR(200)))
-                FROM comment c2
-                INNER JOIN CommentTree ct ON c2.parent_id = ct.id
+                FROM {Comment.name} c2
+                INNER JOIN CommentTree ct ON c2.{Comment.movie_id} = ct.{Comment.id}
                 )
-                SELECT id, user_id, movie_id, parent_id, text, created_at, LENGTH(path) - LENGTH(REPLACE(path, '/', '')) AS depth
+                SELECT {Comment.id}, {Comment.user_id}, {Comment.movie_id}, {Comment.parent_id}, {Comment.text}, {Comment.created_at}, LENGTH(path) - LENGTH(REPLACE(path, '/', '')) AS depth
                 FROM CommentTree
                 ORDER BY path;
                 """
@@ -657,12 +657,14 @@ class Showtime(BaseModel):
     @staticmethod
     def get_showtime_capacity(show_id: int) -> int:
         """Returns the show theater total capacity"""
-        sub_query = Showtime.fetch_query(select=(Showtime.theater_id.name,), where=f'{Showtime.id} = "{show_id}"')
+        sub_query = Showtime.fetch_query(
+            select=(Showtime.theater_id.name,), where=f'{Showtime.id} = "{show_id}"'
+        )
         results = Theater.fetch(
             select=(Theater.capacity.name,),
             where=f"{Theater.id} = ({sub_query})",
         )
-        return results[0]['capacity']
+        return results[0]["capacity"]
 
     @classmethod
     def get_shows_list(cls) -> list["Movie"]:
@@ -764,37 +766,44 @@ class Order(BaseModel):
             select=(Showtime.price.name,), where=f"{Showtime.id} = {self.showtime_id}"
         )[0][Showtime.price.name]
         current_date = datetime.now()
-        paid_price = int(showtime_price * ((100-self.discount)/100))
+        paid_price = int(showtime_price * ((100 - self.discount) / 100))
         refund_amount = int(paid_price * ((100 - fine) / 100))
-        query1 = user.update_query(
-            {User.balance: user.balance + refund_amount}
-        )
+        query1 = user.update_query({User.balance: user.balance + refund_amount})
         query2 = self.update_query({Order.cancel_date: current_date})
         self.db_obj.transaction([query1, query2])
         user.balance += refund_amount
-        return {'refund_amount': refund_amount, 'paid_price': paid_price}
+        return {"refund_amount": refund_amount, "paid_price": paid_price}
 
     @classmethod
     def get_user_orders(cls, user: User) -> list:
-        """list of user orders
+        """list of user orders that their start date has not passed.
 
         Args:
             user (User): user
 
         Returns:
             list: list of user orders
-        """             
-        results = Order.fetch(
-            select=(
-                Order.id.name,
-                Order.showtime_id.name,
-                Order.seat_number.name,
-                Order.discount.name,
-                Order.create_date.name,
-                Order.cancel_date.name,
-            ),
-            where=f"{Order.user_id.name} = {user.id}",
-            order_by=f"{Order.create_date.name}",
-            descending=True,
-        )
+        """
+        query = f"""
+            SELECT
+            o.{Order.id},
+            m.{Movie.m_name} movie_name,
+            t.{Theater.t_name} theater_name,
+            s.{Showtime.start_date} show_start_date,
+            s.{Showtime.end_date} show_end_date,
+            o.{Order.seat_number},
+            o.{Order.create_date} buy_date,
+            s.{Showtime.price},
+            o.{Order.discount},
+            s.{Showtime.price}*(100-o.{Order.discount})/100 paied_price
+            FROM
+            `{Order.name}` o
+            LEFT JOIN {Showtime.name} s ON s.{Showtime.id} = o.{Order.showtime_id}
+            LEFT JOIN {Movie.name} m ON m.{Movie.id} = s.{Showtime.movie_id}
+            LEFT JOIN {Theater.name} t ON t.{Theater.id} = s.{Showtime.theater_id}
+            WHERE
+            o.{Order.user_id} = "{user.id}" AND s.{Showtime.start_date} > NOW()
+            """
+        print(query)
+        results = Order.db_obj.fetch(query)
         return results

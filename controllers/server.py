@@ -122,7 +122,7 @@ class TCPServer:
                     )
                 except (KeyError, TypeError, ValueError, InvalidRequest) as err:
                     # for debuging
-                    print(err)
+                    # print(err)
                     response = create_response(False, "user", "Invalid request.")
                 TCPServer.socket_send(client_socket, response, size_length)
             TCPServer.loging.log_action(

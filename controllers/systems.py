@@ -95,11 +95,11 @@ class UserManagement:
     @staticmethod
     def edit_profile(user: mod.User, data: dict):
         data["user"] = user
-        if "username" not in data:
+        if "username" not in data or not data['username']:
             data["username"] = user.username
-        if "email" not in data:
+        if "email" not in data or not data['email']:
             data["email"] = user.email
-        if "phone_number" not in data:
+        if "phone_number" not in data or not data['phone_number']:
             data["phone_number"] = user.phone_number
         username = user.username
         useremail = user.email

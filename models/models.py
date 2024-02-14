@@ -803,7 +803,8 @@ class Order(BaseModel):
             LEFT JOIN {Movie.name} m ON m.{Movie.id} = s.{Showtime.movie_id}
             LEFT JOIN {Theater.name} t ON t.{Theater.id} = s.{Showtime.theater_id}
             WHERE
-            o.{Order.user_id} = "{user.id}" AND s.{Showtime.start_date} > NOW()
+            o.{Order.user_id} = "{user.id}"
+            ORDER BY show_start_date DESC
             """
         results = Order.db_obj.fetch(query)
         return results

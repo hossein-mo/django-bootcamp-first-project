@@ -1,4 +1,5 @@
 from datetime import date, datetime, timedelta
+from typing import Any
 from controllers.handlers.abstract_handler import AbstractHandler
 from utils.exceptions import NotFound
 from models.models import Subscription, UserSubscription, Order, Showtime
@@ -68,6 +69,22 @@ class CreateSubInovice(AbstractHandler):
         else:
             return data
 
+class ShowtimeCheck(AbstractHandler):
+    """
+    Handler for checking if requested show time has passed or not
+    """
+    def handle(self, data: dict) -> dict | None:
+        show_id = int(data["show_id"])
+        data["show_id"] = show_id
+        show = Showtime.fetch_obj(where=f'{Showtime.id} = "{show_id}" AND {Showtime.start_date} > NOW()')
+        if not show:
+            raise NotFound("Show doesn't exist or its time has passed")
+        show = show[0]
+        data['show'] = show
+        if self._next_handler:
+            return super().handle(data)
+        else:
+            return data
 
 class CalculateDiscountedPrice(AbstractHandler):
     """
@@ -77,11 +94,7 @@ class CalculateDiscountedPrice(AbstractHandler):
 
     def handle(self, data: dict) -> dict | None:
         user = data["user"]
-        show_id = int(data["show_id"])
-        show = Showtime.fetch_obj(where=f"{Showtime.id} = {show_id}")
-        if not show:
-            raise NotFound("Requested show not found")
-        show = show[0]
+        show = data['show']
         today = date.today()
         if today.month == user.birth_date.month and today.dat == user.birth_date.day:
             discount = 50
@@ -109,7 +122,6 @@ class CalculateDiscountedPrice(AbstractHandler):
         else:
             return data
 
-
 class SeatCheck(AbstractHandler):
     """
     Handler for checking for seat avalibility
@@ -117,10 +129,12 @@ class SeatCheck(AbstractHandler):
     """
 
     def handle(self, data: dict) -> dict | None:
-        show_id = int(data["show_id"])
-        data["show_id"] = show_id
+        show_id = data["show_id"]
         seat_number = int(data["seat_number"])
         data["seat_number"] = seat_number
+        capacity = Showtime.get_showtime_capacity(show_id)
+        if seat_number > capacity:
+            raise NotFound("Requested seat doesn't exist.")
         check_seat = Order.fetch(
             where=f'{Order.showtime_id} = "{show_id}" '
             + f'AND {Order.seat_number} = "{seat_number}"'

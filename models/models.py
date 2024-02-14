@@ -1,16 +1,9 @@
-import os
-from re import sub
-import sys
 from datetime import datetime, date
 from mysql.connector import Error as dbError
 from typing import Union, Dict, List
-from abc import ABC, abstractmethod
-
-sys.path.append(os.path.dirname(os.path.dirname(__file__)))
-
 from utils.utils import hash_password
 from models.base_models import Column, UserRole, BaseModel
-from utils.exceptions import WrongCredentials, DuplicatedEntry, DatabaseError
+from utils.exceptions import WrongCredentials
 
 
 class User(BaseModel):
@@ -661,14 +654,15 @@ class Showtime(BaseModel):
         )
         return [d[Order.seat_number.name] for d in results]
 
-    def get_showtime_capacity(self) -> int:
-        """Returns the number of reserved seats"""
-        reserved_seats = "reserved_seats"
-        results = Showtime.fetch(
-            select=f"COUNT(*) as reserved_seats",
-            where=f"{Order.showtime_id.name} = {self.id} AND {Order.cancel_date.name} IS NULL",
+    @staticmethod
+    def get_showtime_capacity(show_id: int) -> int:
+        """Returns the show theater total capacity"""
+        sub_query = Showtime.fetch_query(select=(Showtime.theater_id.name,), where=f'{Showtime.id} = "{show_id}"')
+        results = Theater.fetch(
+            select=(Theater.capacity.name,),
+            where=f"{Theater.id} = ({sub_query})",
         )
-        return results[0][reserved_seats]
+        return results[0]['capacity']
 
     @classmethod
     def get_shows_list(cls) -> list["Movie"]:

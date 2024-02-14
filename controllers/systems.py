@@ -17,11 +17,12 @@ class UserManagement:
 
     Raises:
         Excs.AuthenticationFaild: if authentication failes
-    """    
+    """
+
     loging: Log
 
     @staticmethod
-    def login(data: dict):  
+    def login(data: dict):
         login_handler = uHandlers.LoginHandler()
         data = login_handler.handle(data)
         user = data["user"]
@@ -170,9 +171,9 @@ class UserManagement:
         return response
 
 
-class AccountManagement:  
-    """class for account management operations like adding accounts and transfering funds.
-    """   
+class AccountManagement:
+    """class for account management operations like adding accounts and transfering funds."""
+
     loging: Log
 
     @staticmethod
@@ -285,8 +286,8 @@ class AccountManagement:
 
 
 class CinemaManagement:
-    """class for cinema management operation like adding movies, adding theaters and adding shows.
-    """    
+    """class for cinema management operation like adding movies, adding theaters and adding shows."""
+
     loging: Log
 
     @staticmethod
@@ -437,8 +438,8 @@ class Reports:
 
 
 class Review:
-    """class for review related operations like rating movies and theaters, and writing comments.
-    """
+    """class for review related operations like rating movies and theaters, and writing comments."""
+
     loging: Log
 
     @staticmethod
@@ -492,8 +493,8 @@ class Review:
 
 
 class OrderManagement:
-    """class for buy and cancel operations like seat reservation and cancelation and buying subscriptions
-    """    
+    """class for buy and cancel operations like seat reservation and cancelation and buying subscriptions"""
+
     loging: Log
 
     @staticmethod
@@ -539,7 +540,9 @@ class OrderManagement:
 
     def ticket_pre_invoice(user: mod.User, data: dict) -> dict:
         data["user"] = user
-        handler = oHandlers.CalculateDiscountedPrice()
+        handler = oHandlers.ShowtimeCheck()
+        discount = oHandlers.CalculateDiscountedPrice()
+        handler.set_next(discount)
         try:
             data = handler.handle(data)
         except Excs.NotFound as err:
@@ -551,15 +554,16 @@ class OrderManagement:
         data["user"] = user
         data["dest"] = "withdraw"
         data["origin"] = user
-        handler = oHandlers.CalculateDiscountedPrice()
+        handler = oHandlers.ShowtimeCheck()
+        discount = oHandlers.CalculateDiscountedPrice()
         seat_check = oHandlers.SeatCheck()
         balance_check = baHandlers.BalanceCheck()
         transf = baHandlers.TransferHandler()
         reserve = oHandlers.ReserveSeat()
         invoice = oHandlers.CreateOrderInovice()
-        handler.set_next(seat_check).set_next(balance_check).set_next(transf).set_next(
-            reserve
-        ).set_next(invoice)
+        handler.set_next(discount).set_next(seat_check).set_next(
+            balance_check
+        ).set_next(transf).set_next(reserve).set_next(invoice)
         try:
             data = handler.handle(data)
             order = data["order"]

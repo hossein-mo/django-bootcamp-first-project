@@ -545,9 +545,9 @@ class OrderManagement:
         handler.set_next(discount)
         try:
             data = handler.handle(data)
+            response = create_response(True, "invoice", "", data=data["pre_invoice"])
         except Excs.NotFound as err:
             response = create_response(False, "invoice", err.message)
-        response = create_response(True, "invoice", "", data=data["pre_invoice"])
         return response
 
     def reserve_seat(user: mod.User, data: dict) -> dict:

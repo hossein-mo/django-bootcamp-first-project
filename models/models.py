@@ -456,7 +456,7 @@ class Comment(BaseModel):
 
                 SELECT c2.*, CONCAT(ct.path, '/', CAST(c2.id AS CHAR(200)))
                 FROM {Comment.name} c2
-                INNER JOIN CommentTree ct ON c2.{Comment.movie_id} = ct.{Comment.id}
+                INNER JOIN CommentTree ct ON c2.{Comment.parent_id} = ct.{Comment.id}
                 )
                 SELECT ct.{Comment.id},
                 u.{User.username},

@@ -458,10 +458,20 @@ class Comment(BaseModel):
                 FROM {Comment.name} c2
                 INNER JOIN CommentTree ct ON c2.{Comment.movie_id} = ct.{Comment.id}
                 )
-                SELECT {Comment.id}, {Comment.user_id}, {Comment.movie_id}, {Comment.parent_id}, {Comment.text}, {Comment.created_at}, LENGTH(path) - LENGTH(REPLACE(path, '/', '')) AS depth
-                FROM CommentTree
+                SELECT ct.{Comment.id},
+                u.{User.username},
+                ct.{Comment.movie_id},
+                m.{Movie.m_name},
+                ct.{Comment.parent_id},
+                ct.{Comment.text},
+                ct.{Comment.created_at},
+                LENGTH(ct.path) - LENGTH(REPLACE(ct.path, '/', '')) AS depth
+                FROM CommentTree ct
+                LEFT JOIN `{User.name}` u ON ct.{Comment.user_id} = u.{User.id}
+                LEFT JOIN `{Movie.name}` m ON ct.{Comment.movie_id} = m.{Movie.id}
                 ORDER BY path;
                 """
+        print(query)
         comments = Comment.db_obj.fetch(query)
         return comments
 

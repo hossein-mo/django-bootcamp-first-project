@@ -408,7 +408,7 @@ class Reports:
     def get_commetns(user: mod.User, data: dict):
         comms = mod.Comment.get_comments(data["movie_id"])
         response = create_response(
-            True, "report", "List of shows!", data={"commetns": comms}
+            True, "report", "List of movie comments!", data={"commetns": comms}
         )
         return response
 
@@ -427,7 +427,7 @@ class Reports:
     @staticmethod
     def get_subs(user: mod.User):
         subs = mod.Subscription.fetch()
-        response = create_response(True, "report", "List of reserved seats!", data=subs)
+        response = create_response(True, "report", "List of subscription plans!", data=subs)
         return response
 
     @staticmethod

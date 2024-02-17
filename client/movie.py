@@ -46,7 +46,7 @@ class MovieListPage(Page):
         super().__init__(app)
         self.user = user
         self.movie_list : List[Movie] = []
-        self.firts_user_input = ''
+        self.first_user_input = ''
 
 
     def display_movie_list(self):
@@ -71,7 +71,7 @@ class MovieListPage(Page):
                         print('1. Rate\n2. Comments')
                         if self.user.role == 'admin' or self.user.role == 'staff':
                             print('3. Add movie')
-                        self.firts_user_input = ''
+                        self.first_user_input = ''
                         self.handle_input(input())
                 else:
                     print(response.message)
@@ -86,7 +86,7 @@ class MovieListPage(Page):
             while True:
                 print("\nPress Zero to go back...\n")
                 print("1. Rate\n2. Comments")
-                self.firts_user_input = ''
+                self.first_user_input = ''
                 self.handle_input(input())
 
 
@@ -94,15 +94,15 @@ class MovieListPage(Page):
         try:
             if user_input == "0":
                 self.app.navigate_back()
-            elif user_input == "1" and not self.firts_user_input:
-                self.firts_user_input = "1"
+            elif user_input == "1" and not self.first_user_input:
+                self.first_user_input = "1"
                 while True:
                     self.handle_input(input('\nEnter a movie ID to rate:\n'))
-            elif user_input == "2" and not self.firts_user_input:
-                self.firts_user_input = "2"
+            elif user_input == "2" and not self.first_user_input:
+                self.first_user_input = "2"
                 while True:
                     self.handle_input(input('\nEnter a movie ID to view it\'s comments:\n'))
-            elif user_input == "3" and not self.firts_user_input:
+            elif user_input == "3" and not self.first_user_input:
                 self.app.navigate_to_page(AddMoviePage(self.app))
             elif int(user_input) in range(1, len(self.movie_list+1)):
                 if self.firts_user_input == "1":
@@ -211,7 +211,7 @@ class CommentListPage(Page):
                 self.app.navigate_back()
             elif int(user_input) in range(1, len(self.comment_list)+1):
                 comment_text = input(f'your reply to comment number {user_input}:\n')
-                self.parent_id = int(user_input)
+                self.comment_parent_id = int(user_input)
                 request = self.handle_input(comment_text)
             else:
                 print(f'Comment number {user_input} is not exist.')

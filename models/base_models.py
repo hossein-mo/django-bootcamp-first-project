@@ -402,15 +402,19 @@ class MetaEnum(EnumMeta):
         return True
 
 
-class BaseEnum(Enum, metaclass=MetaEnum):
-    pass
-
-
-class UserRole(BaseEnum, metaclass=MetaEnum):
+class UserRole(Enum, metaclass=MetaEnum):
     ADMIN = "admin"
     STAFF = "staff"
     USER = "user"
 
+    @classmethod
+    def __contains__(cls, item):
+        try:
+            cls(item)
+        except ValueError:
+            return False
+        return True
+    
     @classmethod
     def get_comma_seperated(cls) -> str:
         """Returns a comma seperated string of the Enum class values.

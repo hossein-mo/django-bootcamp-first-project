@@ -30,7 +30,7 @@ class SubscriptionListPage(Page):
             if response.status:
                 data = response.data
                 exp_date = data["expire_date"]
-                print(f'You has {data["subs_name"]} subscription until {data["exp_date"][:exp_date.rfind(":")]}')
+                print(f'You has {data["subs_name"]} subscription until {data["expire_date"][:exp_date.rfind(":")]}')
             input("Press any key to go back... ")
             self.handle_input("0")
         else:
@@ -53,6 +53,7 @@ class SubscriptionListPage(Page):
                     subs_id = self.handle_input(input())
                     if subs_id:
                         self.buy_process(subs_id)
+                        break
             else:
                 print(response.message)
                 input("Press any key to go back... ")

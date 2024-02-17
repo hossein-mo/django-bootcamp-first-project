@@ -146,20 +146,17 @@ class ChangePasswordPage(Page):
         while True:
             old_password = input('Old password: ').strip()
             self.handle_input(old_password)
-            if old_password == self.user.password:
-                new_password = input('New password: ').strip()
-                self.handle_input(new_password)
-                if AccountValidation.is_valid_password(new_password):
-                    confirm_new_password = input('Confirm new password: ').strip()
-                    self.handle_input(confirm_new_password)
-                    if confirm_new_password == new_password:
-                        break
-                    else:
-                        print("\033[91mThe confirm password does not match the new password. Please try again.\033[0m")
+            new_password = input('New password: ').strip()
+            self.handle_input(new_password)
+            if AccountValidation.is_valid_password(new_password):
+                confirm_new_password = input('Confirm new password: ').strip()
+                self.handle_input(confirm_new_password)
+                if confirm_new_password == new_password:
+                    break
                 else:
-                    print("\033[91mThe password is invalid, please try again.\033[0m")
+                    print("\033[91mThe confirm password does not match the new password. Please try again.\033[0m")
             else:
-                print('\033[91mWrong password...\033[0m')
+                print("\033[91mThe password is invalid, please try again.\033[0m")
         request= create_request(type='profile', subtype='changepass', data={'old_password': old_password, 'password': new_password})
         response = connect_server(request)
         if response is not None:

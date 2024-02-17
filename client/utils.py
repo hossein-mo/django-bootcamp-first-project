@@ -31,8 +31,8 @@ def connect_server(request:dict):
         response = client.recive()
         if response is not None:
             response = Response(**response)
-    except TimeoutError:
-        print("connection error! try again...")
+    # except TimeoutError:
+    #     print("connection error! try again...")
     except OSError:
         print("no connection! try again...")
     except Exception:

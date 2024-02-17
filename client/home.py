@@ -58,19 +58,19 @@ class SignUpPage(Page):
     def __init__(self, app:CinemaReservationApp):
         super().__init__(app)
 
-    def handle_response(self, client, response):
+    def handle_response(self, response):
         response = Response(**response)
         if response is not None:
             if response.status:
                 user = User(**response.data)
                 self.app.navigate_to_page(ProfilePage(self.app, user))
             else:
-                client.close()
+                TCPClient().close()
                 print(response.message)
                 input('Press any key to go back... ')
                 self.handle_input('0')
         else:
-            client.close()
+            TCPClient().close()
             print('Connection Error! try again...')
             input('Press any key to go back... ')
             self.handle_input('0')
@@ -100,8 +100,8 @@ class SignUpPage(Page):
         # PhoneNumber
         while True:
             phone = input('Contact Number (Optional):')
-            self.handle_input(self.user.phone)
-            if AccountValidation.is_valid_phone(phone):
+            self.handle_input(phone)
+            if not phone or AccountValidation.is_valid_phone(phone):
                 break
             else:
                 print('\033[91mThe PhoneNumber is invalid. please try again.\033[0m')

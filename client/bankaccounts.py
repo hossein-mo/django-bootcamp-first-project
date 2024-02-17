@@ -7,7 +7,7 @@ from getpass import getpass
 from utils import create_request, clear_screen, Page, connect_server
 
 class BankAccount:
-    def __init__(self, name, card_number, cvv2, password, balance = 0, id = None):
+    def __init__(self, name, card_number, cvv2 = None, password = None, balance = 0, id = None):
         self.name = name
         self.card_number = card_number
         self.cvv2 = cvv2
@@ -78,7 +78,7 @@ class AccountListPage(Page):
         else:
             for i in range(len(self.account_list)):
                 print(f'{i+1}. name: {self.account_list[i].name} card number: {self.account_list[i].card_number} balance: {self.account_list[i].balance}')
-            print(f'\n1. Create account \n2 Deposit\n3. Withdraw\n4. Transfer\n5. Charge wallet\npress any else key to go back...')
+            print(f'\n1. Create account \n2. Deposit\n3. Withdraw\n4. Transfer\n5. Charge wallet\npress any else key to go back...')
             self.handle_input(input())
 
         
@@ -108,7 +108,7 @@ class DepositPage(Page):
         print(f'**** Deposit ****\n')   
         for i in range(len(self.account_list)):
             print(f'{i+1}. name: {self.account_list[i].name} card number: {self.account_list[i].card_number} balance: {self.account_list[i].balance}')
-        print(f'\nPress Zero to go back...')
+        print(f'\n>>> Press Zero to go back <<<')
         while True:
             card_number = input("Enter account number:")
             self.handle_input(card_number)
@@ -116,7 +116,7 @@ class DepositPage(Page):
                 if int(card_number) not in range(1, len(self.account_list)+1):
                     print("Invalid number!")
                 else:
-                    id = self.account_list[card_number-1].id
+                    id = self.account_list[int(card_number)-1].id
                     break
             except ValueError:
                 print("Invalid value!")
@@ -158,7 +158,7 @@ class WithdrawPage(Page):
                 if int(card_number) not in range(1, len(self.account_list)+1):
                     print("Invalid number!")
                 else:
-                    id = self.account_list[card_number-1].id
+                    id = self.account_list[int(card_number)-1].id
                     break
             except ValueError:
                 print("Invalid value!")        
@@ -210,7 +210,7 @@ class TransferPage(Page):
                 if int(card_number) not in range(1, len(self.account_list)+1):
                     print("Invalid number!")
                 else:
-                    from_id = self.account_list[card_number-1].id
+                    from_id = self.account_list[int(card_number)-1].id
                     break
             except ValueError:
                 print("Invalid value!")
@@ -278,7 +278,7 @@ class ChargeWalletPage(Page):
                 if int(card_number) not in range(1, len(self.account_list)+1):
                     print("Invalid id!")
                 else:
-                    id = self.account_list[card_number-1].id
+                    id = self.account_list[(card_number)-1].id
                     break
             except ValueError:
                 print("Invalid value!")        
@@ -309,6 +309,4 @@ class ChargeWalletPage(Page):
         else:
             print("Connection Error! Try again...")
             self.display()
-
-
 

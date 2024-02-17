@@ -23,6 +23,22 @@ def clear_screen():
     """    
     os.system('cls' if os.name == 'nt' else 'clear')
 
+def connect_server(request:dict):
+    response = None
+    try:
+        client = TCPClient()
+        client.send(request)
+        response = client.recive()
+        if response is not None:
+            response = Response(**response)
+    except TimeoutError:
+        print("connection error! try again...")
+    except OSError:
+        print("no connection! try again...")
+    except Exception:
+        print("We had a problem processing your request. Please try again later.")
+    return response
+
     
 class Response:
     def __init__(self, status, type, message, data):
@@ -51,12 +67,6 @@ class CinemaReservationApp:
 
     def start(self, home_page):
         self.navigate_to_page(home_page)
-        # while True:
-        #     user_input = input("Enter your choice: ")
-        #     if user_input == "0":
-        #         self.navigate_back()
-        #     else:
-        #         self.current_page.handle_input(user_input, self)
     
     def restart(self):
         TCPClient().close()
@@ -77,3 +87,8 @@ class Page(ABC):
     def handle_input(self, user_input):
         if user_input == "0":
             self.app.navigate_back()
+
+class OutOfRangeError(Exception):
+    def __init__(self, message="Input is not within the specified range."):
+        self.message = message
+        super().__init__(self.message)

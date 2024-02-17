@@ -125,7 +125,7 @@ class TCPServer:
                     # print(err)
                     response = create_response(False, "user", "Invalid request.")
                 TCPServer.socket_send(client_socket, response, size_length)
-            TCPServer.loging.log_action(
+            TCPServer.loging.log_info(
                 f"User logged out. username: {user.username}, id: {user.id}"
             )
         addr = client_socket.getpeername()

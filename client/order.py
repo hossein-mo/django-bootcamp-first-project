@@ -83,7 +83,7 @@ class UserOrdersPage(Page):
                                             list(filter(lambda x: 
                                                 datetime.strptime(x['show_start_date'], date_format) > now and x['cancel_date'] == None, self.order_list))))
             elif self.order_list and user_input == '2':
-                self.firts_user_input = '2'
+                UserOrdersPage.firts_user_input = '2'
             else:
                 raise ValueError()
         except ValueError:

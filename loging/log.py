@@ -15,23 +15,21 @@ class Log(metaclass=SingletonMeta):
             location (str, optional): root location of the log folder by default it is PROJECT_ROOT/logs, can be change in config.ini. Defaults to 'default'.
         """        
         # checks if the instance is already initialized
-        if not hasattr(self, "initialized"):
-            if location == 'default':
-                logs_root = Path(__file__).parent.parent.joinpath('logs')
-            else:
-                logs_root = Path(location)
-            os.makedirs(logs_root, exist_ok=True)
-            self.transactions_log_path = logs_root.joinpath("transactions.log")
-            self.actions_log_path = logs_root.joinpath("cinema.log")
-            self.errors_log_path = logs_root.joinpath("errors.log")
-            self.info_log_path = logs_root.joinpath("info.log")
-            # Create locks for each log file
-            self.transactions_log_lock = threading.Lock()
-            self.actions_log_lock = threading.Lock()
-            self.errors_log_lock = threading.Lock()
-            self.info_log_lock = threading.Lock()
-            # checks log directories exist
-            self.initialized = True
+        if location == 'default':
+            logs_root = Path(__file__).parent.parent.joinpath('logs')
+        else:
+            logs_root = Path(location)
+        os.makedirs(logs_root, exist_ok=True)
+        self.transactions_log_path = logs_root.joinpath("transactions.log")
+        self.actions_log_path = logs_root.joinpath("cinema.log")
+        self.errors_log_path = logs_root.joinpath("errors.log")
+        self.info_log_path = logs_root.joinpath("info.log")
+        # Create locks for each log file
+        self.transactions_log_lock = threading.Lock()
+        self.actions_log_lock = threading.Lock()
+        self.errors_log_lock = threading.Lock()
+        self.info_log_lock = threading.Lock()
+        # checks log directories exist
 
     def log_info(self, message: str) -> None:
         """write log to the info file, this are server info like connection and disconnection of clients.

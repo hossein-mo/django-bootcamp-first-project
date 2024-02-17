@@ -324,23 +324,6 @@ class Subscription(BaseModel):
         self.order_number = order_number
         self.price = price
 
-    def set_new_subscription(self):
-        self.insert()
-
-    def update_subscription(self):
-        self.update(
-            {
-                Subscription.s_name: self.s_name,
-                Subscription.discount: self.discount,
-                Subscription.duration: self.duration,
-                Subscription.order_number: self.order_number,
-            }
-        )
-
-    def delete_subscription(self):
-        self.delete()
-
-
 class Movie(BaseModel):
     name = "movie"
     id = Column("id", "INT UNSIGNED", primary_key=True, auto_increment=True)
@@ -438,12 +421,6 @@ class Comment(BaseModel):
         self.created_at = created_at
 
     @staticmethod
-    def create_new(user_id: int, movie_id: int, parent_id: int, text: str) -> None:
-        comm = Comment(user_id, movie_id, parent_id, text, datetime.now())
-        comm.insert()
-        return comm
-
-    @staticmethod
     def get_comments(movie_id) -> list["Comment"]:
         result = []
         query = f"""
@@ -471,7 +448,6 @@ class Comment(BaseModel):
                 LEFT JOIN `{Movie.name}` m ON ct.{Comment.movie_id} = m.{Movie.id}
                 ORDER BY path;
                 """
-        print(query)
         comments = Comment.db_obj.fetch(query)
         return comments
 
@@ -506,37 +482,30 @@ class UserSubscription(BaseModel):
         self.expire_date = expire_date
 
     @staticmethod
-    def set_user_subscription(user, subscription):
+    def set_user_subscription(user: User, subscription: Subscription):
         queries = []
         duration = Subscription.fetch(
-            select=f"{Subscription.duration.name}",
+            select=(Subscription.duration.name,),
             where=f"{Subscription.id.name}={subscription.id}",
         )
-        duration - duration[0][Subscription.duration.name]
+        duration = duration[0][Subscription.duration.name]
         price = Subscription.fetch(
-            select=f"{Subscription.price.name}",
+            select=(Subscription.price.name,),
             where=f"{Subscription.id.name}={subscription.id}",
         )
         price = price[0][Subscription.price.name]
-        if user.subscription is not None:
-            queries.append(
-                f"UPDATE {UserSubscription.name} SET {UserSubscription.expire_date.name} = now() WHERE \
-                               {UserSubscription.id.name} = (SELECT {UserSubscription.id.name} from {UserSubscription.name} WHERE \
-                                    {UserSubscription.user_id.name} = {user.id} AND {UserSubscription.expire_date.name}>now())"
-            )
-
+        new_user_balance = user.balance - price
         queries.append(
-            f"UPDATE {User.name} SET {User.balance.name}={User.balance.name} - {price} WHERE {User.id.name} = {user.id}"
+            f"UPDATE {User.name} SET {User.balance.name}={new_user_balance} WHERE {User.id.name} = {user.id}"
         )
         queries.append(
-            f"INSERT INTO {UserSubscription.name} VALUES ({user.id}, {subscription.id}, NOW(), DATE_ADD(NOW(), INTERVAL {duration} DAY))"
+            f"""INSERT INTO {UserSubscription.name} 
+            ({UserSubscription.user_id},{UserSubscription.subscription_id},{UserSubscription.buy_date},{UserSubscription.expire_date}) 
+            VALUES 
+            ({user.id}, {subscription.id}, NOW(), DATE_ADD(NOW(), INTERVAL {duration} DAY))"""
         )
-
-        try:
-            UserSubscription.db_obj.transaction(queries)
-        except dbError as err:
-            # print(f'Error while updating rows in "{self.name}".')
-            print(f"Error description: {err}")
+        UserSubscription.db_obj.transaction(queries)
+        user.balance = new_user_balance
 
 
 class Theater(BaseModel):
@@ -639,17 +608,6 @@ class Showtime(BaseModel):
             "end_date": self.end_date,
             "price": self.price,
         }
-
-    def update_showtime(self):
-        self.update(
-            {
-                Showtime.movie_id: self.movie_id,
-                Showtime.theater_id: self.theater_id,
-                Showtime.start_date: self.start_date,
-                Showtime.end_date: self.end_date,
-                Showtime.price: self.price,
-            }
-        )
 
     @staticmethod
     def get_reserved_seat(show_id: int) -> list[int]:

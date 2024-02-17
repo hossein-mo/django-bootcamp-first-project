@@ -34,10 +34,12 @@ class BuySub(AbstractHandler):
     def handle(self, data: dict) -> dict | None:
         user = data["user"]
         subs = data["subs"]
-        datetime_now = datetime.now()
-        datetime_expire = datetime_now + timedelta(days=subs.duration)
-        user_sub = UserSubscription(user.id, subs.id, datetime_now, datetime_expire)
-        user_sub.insert()
+        UserSubscription.set_user_subscription(user, subs)
+        user_sub = UserSubscription.fetch_obj(
+            where=f"{UserSubscription.user_id}={user.id} AND {UserSubscription.expire_date} > NOW()"
+        )
+        if user_sub:
+            user_sub = user_sub[-1]
         user.subs = subs
         user.sub_exp = subs.duration
         user.user_sub = user_sub
@@ -69,22 +71,27 @@ class CreateSubInovice(AbstractHandler):
         else:
             return data
 
+
 class ShowtimeCheck(AbstractHandler):
     """
     Handler for checking if requested show time has passed or not
     """
+
     def handle(self, data: dict) -> dict | None:
         show_id = int(data["show_id"])
         data["show_id"] = show_id
-        show = Showtime.fetch_obj(where=f'{Showtime.id} = "{show_id}" AND {Showtime.start_date} > NOW()')
+        show = Showtime.fetch_obj(
+            where=f'{Showtime.id} = "{show_id}" AND {Showtime.start_date} > NOW()'
+        )
         if not show:
             raise NotFound("Show doesn't exist or its time has passed")
         show = show[0]
-        data['show'] = show
+        data["show"] = show
         if self._next_handler:
             return super().handle(data)
         else:
             return data
+
 
 class CalculateDiscountedPrice(AbstractHandler):
     """
@@ -94,7 +101,7 @@ class CalculateDiscountedPrice(AbstractHandler):
 
     def handle(self, data: dict) -> dict | None:
         user = data["user"]
-        show = data['show']
+        show = data["show"]
         today = date.today()
         if today.month == user.birth_date.month and today.dat == user.birth_date.day:
             discount = 50
@@ -121,6 +128,7 @@ class CalculateDiscountedPrice(AbstractHandler):
             return super().handle(data)
         else:
             return data
+
 
 class SeatCheck(AbstractHandler):
     """

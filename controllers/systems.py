@@ -10,7 +10,13 @@ from loging.log import Log
 from models.base_models import UserRole
 from controllers.authorization import authorize
 from utils.utils import create_response
+from utils.caching import Cache, invalidate, memoize
 
+_show_list_cache_key = 'show_list'
+_movie_list_cache_key = 'movie_list'
+_theater_list_cache_key = 'theater_list'
+_subs_list_cache_key = 'subs_list'
+cache = Cache()
 
 class UserManagement:
     """class for user management operations like login, sign up, edit profile, changing password and etc
@@ -304,6 +310,7 @@ class CinemaManagement:
         return response
 
     @staticmethod
+    @invalidate(cache, _movie_list_cache_key)
     @authorize(authorized_roles={UserRole.ADMIN, UserRole.STAFF})
     def add_movie(user: mod.User, data: dict) -> dict:
         handler = cHandlers.CheckMovieInfo()
@@ -320,6 +327,7 @@ class CinemaManagement:
         return response
 
     @staticmethod
+    @invalidate(cache, _theater_list_cache_key)
     @authorize(authorized_roles={UserRole.ADMIN})
     def add_theater(user: mod.User, data: dict) -> dict:
         handler = cHandlers.CheckTheaterInfo()
@@ -336,6 +344,7 @@ class CinemaManagement:
         return response
 
     @staticmethod
+    @invalidate(cache, _show_list_cache_key)
     @authorize(authorized_roles={UserRole.ADMIN, UserRole.STAFF})
     def add_show(user: mod.User, data: dict):
         handler = cHandlers.CheckTheater()
@@ -387,18 +396,21 @@ class Reports:
 
     @staticmethod
     @authorize(authorized_roles={UserRole.ADMIN, UserRole.STAFF})
+    @memoize(cache, _theater_list_cache_key, ttl=3000)
     def get_theaters(user: mod.User):
         data = mod.Theater.get_theater_list()
         response = create_response(True, "report", "List of theaters!", data=data)
         return response
 
     @staticmethod
+    @memoize(cache, _movie_list_cache_key)
     def get_movies(user: mod.User):
         data = mod.Movie.get_movies_list()
         response = create_response(True, "report", "List of movies!", data=data)
         return response
 
     @staticmethod
+    @memoize(cache, _show_list_cache_key)
     def get_shows(user: mod.User):
         data = mod.Showtime.get_shows_list()
         response = create_response(True, "report", "List of shows!", data=data)
@@ -425,6 +437,7 @@ class Reports:
         return response
 
     @staticmethod
+    @memoize(cache, _subs_list_cache_key, ttl=86400)
     def get_subs(user: mod.User):
         subs = mod.Subscription.fetch()
         response = create_response(True, "report", "List of subscription plans!", data=subs)
@@ -520,10 +533,9 @@ class OrderManagement:
         data["user"] = user
         handler = oHandlers.SubCheck()
         balance_check = baHandlers.BalanceCheck()
-        transf = baHandlers.TransferHandler()
         buy_sub = oHandlers.BuySub()
         inovice = oHandlers.CreateSubInovice()
-        handler.set_next(balance_check).set_next(transf).set_next(buy_sub).set_next(
+        handler.set_next(balance_check).set_next(buy_sub).set_next(
             inovice
         )
         try:

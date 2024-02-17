@@ -149,3 +149,10 @@ class TCPServer:
                 target=TCPServer.client_handler, args=(client, self.SIZE_BYTES_LENGTH)
             )
             client_handler.start()
+
+    def stop_server(self):
+        running_threads = threading.enumerate()
+        print("Stopping client threads")
+        for thread in running_threads:
+            if thread != threading.current_thread():  # Skip the current thread
+                thread.join()

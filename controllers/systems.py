@@ -420,7 +420,7 @@ class Reports:
     def get_commetns(user: mod.User, data: dict):
         comms = mod.Comment.get_comments(data["movie_id"])
         response = create_response(
-            True, "report", "List of movie comments!", data={"commetns": comms}
+            True, "report", "List of movie comments!", data={"comments": comms}
         )
         return response
 

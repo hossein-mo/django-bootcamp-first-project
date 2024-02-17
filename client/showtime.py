@@ -25,13 +25,13 @@ class ShowsPage(Page):
     show_list = []
 
     def display_list(self):
-        for i in range(self.show_list):
-            show = Show(**self.order_show_listlist[i])
+        for i in range(len(self.show_list)):
+            show = Show(**self.show_list[i])
             show.movie = Movie(**show.movie)
             show.theater = Theater(**show.theater)
             print(f'{i+1}. movie: {show.movie.m_name} (+{show.movie.age_rating}), {show.movie.duration} minutes,\
                 {show.movie.screening_number} screening(s), rate = {show.movie.rate}\n\
-                theater: {show.theater.t_name}, date: {show.start_date[:show.start_date.rfind(":")]}\n\
+                theater: {show.theater.t_name}, date: {show.start_date}\n\
                 price: {show.price}')
     
     def buy_process(self):

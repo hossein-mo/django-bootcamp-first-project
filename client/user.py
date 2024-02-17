@@ -66,22 +66,22 @@ class ProfilePage(Page):
         elif user_input == '7':
             self.app.navigate_to_page(MovieListPage(self.app, self.user))
         elif user_input == '8':
-            if self.user_role == 'user':
+            if self.user.role == 'user':
                 self.app.restart()
-            elif self.user_role == 'admin' or self.user_role == 'staff':
+            elif self.user.role == 'admin' or self.user.role == 'staff':
                 self.app.navigate_to_page(TheaterListPage(self.app))
             else:
                 print(f'Invalid input!')
                 flag = False
-        elif self.user_role == 'admin' or self.user_role == 'staff':
+        elif self.user.role == 'admin' or self.user.role == 'staff':
             if user_input == '9':
                 self.app.navigate_to_page(AddShowPage(self.app))
             elif user_input == '10':
-                if self.user_role == 'admin':
+                if self.user.role == 'admin':
                     self.app.navigate_to_page(ChangeRolePage(self.app))
                 else:
                     self.app.restart()
-            elif user_input == '11' and self.user_role == 'admin':
+            elif user_input == '11' and self.user.role == 'admin':
                 self.app.restart()
         else:
             print(f'Invalid input!')

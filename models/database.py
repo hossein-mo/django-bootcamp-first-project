@@ -24,7 +24,9 @@ class DatabaseConnection(metaclass=SingletonMeta):
             cursor.execute(f'SHOW DATABASES LIKE "{self.db_name}";')
             database_exists = cursor.fetchone()
             if not database_exists:
+                DatabaseConnection.loging.log_info("Database didn't exist creating it ...")
                 cursor.execute(f"CREATE DATABASE {self.db_name};")
+                DatabaseConnection.loging.log_info("Database created.")
             connection.commit()
             cursor.close()
 

@@ -125,7 +125,7 @@ class TCPServer:
                     # print(err)
                     response = create_response(False, "user", "Invalid request.")
                 TCPServer.socket_send(client_socket, response, size_length)
-            TCPServer.loging.log_action(
+            TCPServer.loging.log_info(
                 f"User logged out. username: {user.username}, id: {user.id}"
             )
         addr = client_socket.getpeername()
@@ -149,3 +149,10 @@ class TCPServer:
                 target=TCPServer.client_handler, args=(client, self.SIZE_BYTES_LENGTH)
             )
             client_handler.start()
+
+    def stop_server(self):
+        running_threads = threading.enumerate()
+        print("Stopping client threads")
+        for thread in running_threads:
+            if thread != threading.current_thread():  # Skip the current thread
+                thread.join()

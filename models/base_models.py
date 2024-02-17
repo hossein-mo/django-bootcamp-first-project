@@ -1,11 +1,7 @@
-import os
-import sys
 from enum import Enum, EnumMeta
-from typing import Union, Any, List, Dict
+from typing import Iterable, Union, Any, List, Dict
 from mysql.connector import Error as dbError
 from mysql.connector import IntegrityError
-
-sys.path.append(os.path.dirname(os.path.dirname(__file__)))
 from models.database import DatabaseConnection
 from utils.exceptions import DuplicatedEntry, DatabaseError
 from loging.log import Log
@@ -180,19 +176,19 @@ class BaseModel:
             cls.loging.log_info(f"{cls.name} table succesfully created in the database")
 
     @classmethod
-    def fetch(
+    def fetch_query(
         cls,
-        select: str = "*",
+        select: Iterable | str = "*",
         where: str = None,
         order_by: str = None,
         descending: bool = False,
         limit: int = None,
         offset: int = None,
-    ) -> List[dict]:
-        """Executes select query in the table of model instance.
+    ) -> str:
+        """generates select query in the table of model.
 
         Returns:
-            dict: List of fetched rows as dictionary of selected columns
+            str: select query
         """
         query = f'SELECT {",".join(select)} FROM `{cls.name}`'
         if where:
@@ -205,6 +201,31 @@ class BaseModel:
             query = f"{query} LIMIT {limit}"
         if offset:
             query = f"{query} OFFSET {offset}"
+        return query
+
+    @classmethod
+    def fetch(
+        cls,
+        select: Iterable | str = "*",
+        where: str = None,
+        order_by: str = None,
+        descending: bool = False,
+        limit: int = None,
+        offset: int = None,
+    ) -> List[dict]:
+        """Executes select query in the table of model instance.
+
+        Returns:
+            dict: List of fetched rows as dictionary of selected columns
+        """
+        query = cls.fetch_query(
+            select=select,
+            where=where,
+            order_by=order_by,
+            descending=descending,
+            limit=limit,
+            offset=offset,
+        )
         try:
             results = cls.db_obj.fetch(query)
         except dbError as err:
@@ -258,7 +279,7 @@ class BaseModel:
             else:
                 v = obj_dict[column.name]
             if v == None:
-                values = f'{values}NULL,'
+                values = f"{values}NULL,"
             elif column.as_string:
                 values = f'{values}"{v}",'
             else:
@@ -381,15 +402,19 @@ class MetaEnum(EnumMeta):
         return True
 
 
-class BaseEnum(Enum, metaclass=MetaEnum):
-    pass
-
-
-class UserRole(BaseEnum, metaclass=MetaEnum):
+class UserRole(Enum, metaclass=MetaEnum):
     ADMIN = "admin"
     STAFF = "staff"
     USER = "user"
 
+    @classmethod
+    def __contains__(cls, item):
+        try:
+            cls(item)
+        except ValueError:
+            return False
+        return True
+    
     @classmethod
     def get_comma_seperated(cls) -> str:
         """Returns a comma seperated string of the Enum class values.

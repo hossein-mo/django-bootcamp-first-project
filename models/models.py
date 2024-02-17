@@ -1,16 +1,9 @@
-import os
-from re import sub
-import sys
 from datetime import datetime, date
 from mysql.connector import Error as dbError
 from typing import Union, Dict, List
-from abc import ABC, abstractmethod
-
-sys.path.append(os.path.dirname(os.path.dirname(__file__)))
-
 from utils.utils import hash_password
 from models.base_models import Column, UserRole, BaseModel
-from utils.exceptions import WrongCredentials, DuplicatedEntry, DatabaseError
+from utils.exceptions import WrongCredentials
 
 
 class User(BaseModel):
@@ -331,23 +324,6 @@ class Subscription(BaseModel):
         self.order_number = order_number
         self.price = price
 
-    def set_new_subscription(self):
-        self.insert()
-
-    def update_subscription(self):
-        self.update(
-            {
-                Subscription.s_name: self.s_name,
-                Subscription.discount: self.discount,
-                Subscription.duration: self.duration,
-                Subscription.order_number: self.order_number,
-            }
-        )
-
-    def delete_subscription(self):
-        self.delete()
-
-
 class Movie(BaseModel):
     name = "movie"
     id = Column("id", "INT UNSIGNED", primary_key=True, auto_increment=True)
@@ -445,28 +421,31 @@ class Comment(BaseModel):
         self.created_at = created_at
 
     @staticmethod
-    def create_new(user_id: int, movie_id: int, parent_id: int, text: str) -> None:
-        comm = Comment(user_id, movie_id, parent_id, text, datetime.now())
-        comm.insert()
-        return comm
-
-    @staticmethod
     def get_comments(movie_id) -> list["Comment"]:
         result = []
         query = f"""
                 WITH RECURSIVE CommentTree AS (
-                SELECT c.*, CAST(c.id AS CHAR(200)) AS path
-                FROM comment c
-                WHERE c.parent_id IS NULL AND c.movie_id = {movie_id}
+                SELECT c.*, CAST(c.{Comment.id} AS CHAR(200)) AS path
+                FROM {Comment.name} c
+                WHERE c.{Comment.parent_id} IS NULL AND c.{Comment.movie_id} = "{movie_id}"
 
                 UNION ALL
 
                 SELECT c2.*, CONCAT(ct.path, '/', CAST(c2.id AS CHAR(200)))
-                FROM comment c2
-                INNER JOIN CommentTree ct ON c2.parent_id = ct.id
+                FROM {Comment.name} c2
+                INNER JOIN CommentTree ct ON c2.{Comment.parent_id} = ct.{Comment.id}
                 )
-                SELECT id, user_id, movie_id, parent_id, text, created_at, LENGTH(path) - LENGTH(REPLACE(path, '/', '')) AS depth
-                FROM CommentTree
+                SELECT ct.{Comment.id},
+                u.{User.username},
+                ct.{Comment.movie_id},
+                m.{Movie.m_name},
+                ct.{Comment.parent_id},
+                ct.{Comment.text},
+                ct.{Comment.created_at},
+                LENGTH(ct.path) - LENGTH(REPLACE(ct.path, '/', '')) AS depth
+                FROM CommentTree ct
+                LEFT JOIN `{User.name}` u ON ct.{Comment.user_id} = u.{User.id}
+                LEFT JOIN `{Movie.name}` m ON ct.{Comment.movie_id} = m.{Movie.id}
                 ORDER BY path;
                 """
         comments = Comment.db_obj.fetch(query)
@@ -503,37 +482,30 @@ class UserSubscription(BaseModel):
         self.expire_date = expire_date
 
     @staticmethod
-    def set_user_subscription(user, subscription):
+    def set_user_subscription(user: User, subscription: Subscription):
         queries = []
         duration = Subscription.fetch(
-            select=f"{Subscription.duration.name}",
+            select=(Subscription.duration.name,),
             where=f"{Subscription.id.name}={subscription.id}",
         )
-        duration - duration[0][Subscription.duration.name]
+        duration = duration[0][Subscription.duration.name]
         price = Subscription.fetch(
-            select=f"{Subscription.price.name}",
+            select=(Subscription.price.name,),
             where=f"{Subscription.id.name}={subscription.id}",
         )
         price = price[0][Subscription.price.name]
-        if user.subscription is not None:
-            queries.append(
-                f"UPDATE {UserSubscription.name} SET {UserSubscription.expire_date.name} = now() WHERE \
-                               {UserSubscription.id.name} = (SELECT {UserSubscription.id.name} from {UserSubscription.name} WHERE \
-                                    {UserSubscription.user_id.name} = {user.id} AND {UserSubscription.expire_date.name}>now())"
-            )
-
+        new_user_balance = user.balance - price
         queries.append(
-            f"UPDATE {User.name} SET {User.balance.name}={User.balance.name} - {price} WHERE {User.id.name} = {user.id}"
+            f"UPDATE {User.name} SET {User.balance.name}={new_user_balance} WHERE {User.id.name} = {user.id}"
         )
         queries.append(
-            f"INSERT INTO {UserSubscription.name} VALUES ({user.id}, {subscription.id}, NOW(), DATE_ADD(NOW(), INTERVAL {duration} DAY))"
+            f"""INSERT INTO {UserSubscription.name} 
+            ({UserSubscription.user_id},{UserSubscription.subscription_id},{UserSubscription.buy_date},{UserSubscription.expire_date}) 
+            VALUES 
+            ({user.id}, {subscription.id}, NOW(), DATE_ADD(NOW(), INTERVAL {duration} DAY))"""
         )
-
-        try:
-            UserSubscription.db_obj.transaction(queries)
-        except dbError as err:
-            # print(f'Error while updating rows in "{self.name}".')
-            print(f"Error description: {err}")
+        UserSubscription.db_obj.transaction(queries)
+        user.balance = new_user_balance
 
 
 class Theater(BaseModel):
@@ -637,17 +609,6 @@ class Showtime(BaseModel):
             "price": self.price,
         }
 
-    def update_showtime(self):
-        self.update(
-            {
-                Showtime.movie_id: self.movie_id,
-                Showtime.theater_id: self.theater_id,
-                Showtime.start_date: self.start_date,
-                Showtime.end_date: self.end_date,
-                Showtime.price: self.price,
-            }
-        )
-
     @staticmethod
     def get_reserved_seat(show_id: int) -> list[int]:
         """Returns reserved seat numbers of given show
@@ -661,14 +622,17 @@ class Showtime(BaseModel):
         )
         return [d[Order.seat_number.name] for d in results]
 
-    def get_showtime_capacity(self) -> int:
-        """Returns the number of reserved seats"""
-        reserved_seats = "reserved_seats"
-        results = Showtime.fetch(
-            select=f"COUNT(*) as reserved_seats",
-            where=f"{Order.showtime_id.name} = {self.id} AND {Order.cancel_date.name} IS NULL",
+    @staticmethod
+    def get_showtime_capacity(show_id: int) -> int:
+        """Returns the show theater total capacity"""
+        sub_query = Showtime.fetch_query(
+            select=(Showtime.theater_id.name,), where=f'{Showtime.id} = "{show_id}"'
         )
-        return results[0][reserved_seats]
+        results = Theater.fetch(
+            select=(Theater.capacity.name,),
+            where=f"{Theater.id} = ({sub_query})",
+        )
+        return results[0]["capacity"]
 
     @classmethod
     def get_shows_list(cls) -> list["Movie"]:
@@ -770,37 +734,45 @@ class Order(BaseModel):
             select=(Showtime.price.name,), where=f"{Showtime.id} = {self.showtime_id}"
         )[0][Showtime.price.name]
         current_date = datetime.now()
-        paid_price = int(showtime_price * ((100-self.discount)/100))
+        paid_price = int(showtime_price * ((100 - self.discount) / 100))
         refund_amount = int(paid_price * ((100 - fine) / 100))
-        query1 = user.update_query(
-            {User.balance: user.balance + refund_amount}
-        )
+        query1 = user.update_query({User.balance: user.balance + refund_amount})
         query2 = self.update_query({Order.cancel_date: current_date})
         self.db_obj.transaction([query1, query2])
         user.balance += refund_amount
-        return {'refund_amount': refund_amount, 'paid_price': paid_price}
+        return {"refund_amount": refund_amount, "paid_price": paid_price}
 
     @classmethod
     def get_user_orders(cls, user: User) -> list:
-        """list of user orders
+        """list of user orders that their start date has not passed.
 
         Args:
             user (User): user
 
         Returns:
             list: list of user orders
-        """             
-        results = Order.fetch(
-            select=(
-                Order.id.name,
-                Order.showtime_id.name,
-                Order.seat_number.name,
-                Order.discount.name,
-                Order.create_date.name,
-                Order.cancel_date.name,
-            ),
-            where=f"{Order.user_id.name} = {user.id}",
-            order_by=f"{Order.create_date.name}",
-            descending=True,
-        )
+        """
+        query = f"""
+            SELECT
+            o.{Order.id},
+            m.{Movie.m_name} movie_name,
+            t.{Theater.t_name} theater_name,
+            s.{Showtime.start_date} show_start_date,
+            s.{Showtime.end_date} show_end_date,
+            o.{Order.seat_number},
+            s.{Showtime.price},
+            o.{Order.discount},
+            o.{Order.create_date} buy_date,
+            o.{Order.cancel_date},
+            FLOOR(s.{Showtime.price}*(100-o.{Order.discount})/100) paied_price
+            FROM
+            `{Order.name}` o
+            LEFT JOIN {Showtime.name} s ON s.{Showtime.id} = o.{Order.showtime_id}
+            LEFT JOIN {Movie.name} m ON m.{Movie.id} = s.{Showtime.movie_id}
+            LEFT JOIN {Theater.name} t ON t.{Theater.id} = s.{Showtime.theater_id}
+            WHERE
+            o.{Order.user_id} = "{user.id}"
+            ORDER BY show_start_date DESC
+            """
+        results = Order.db_obj.fetch(query)
         return results

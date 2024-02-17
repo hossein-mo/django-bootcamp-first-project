@@ -18,10 +18,11 @@ class Movie:
 
 
 class Comment:
-    def __init__(self, id, user_name, movie_id, parent_id, text, created_at, depth):
+    def __init__(self, id, username, m_name, movie_id, parent_id, text, created_at, depth):
         self.id = id
-        self.user_name = user_name
+        self.user_name = username
         self.movie_id = movie_id
+        self.m_name = m_name
         self.parent_id = parent_id
         self.text = text
         self.created_at = created_at
@@ -104,11 +105,11 @@ class MovieListPage(Page):
                     self.handle_input(input('\nEnter a movie ID to view it\'s comments:\n'))
             elif user_input == "3" and not self.first_user_input:
                 self.app.navigate_to_page(AddMoviePage(self.app))
-            elif int(user_input) in range(1, len(self.movie_list+1)):
+            elif int(user_input) in range(1, len(self.movie_list)+1):
                 if self.firts_user_input == "1":
-                    self.app.navigate_to_page(RatingMoviePage(self.app, self.movie_list[user_input-1].id))
+                    self.app.navigate_to_page(RatingMoviePage(self.app, self.movie_list[int(user_input)-1].id))
                 else:
-                    self.app.navigate_to_page(CommentListPage(self.app, self.movie_list[user_input-1].id))
+                    self.app.navigate_to_page(CommentListPage(self.app, self.movie_list[int(user_input)-1].id))
             else:
                 raise ValueError()
         except ValueError:
@@ -179,7 +180,8 @@ class CommentListPage(Page):
         response = connect_server(request)
         if response is not None:
             if response.status:
-                CommentListPage.comment_list = list(map(lambda x: Comment(**x), response.data))
+                for comm in response.data['comments']: 
+                    self.comment_list.append(Comment(**comm))
                 self.display_list()
                 print(f'\n>>> Press Zero to go back <<<')
                 while True:

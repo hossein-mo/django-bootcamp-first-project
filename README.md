@@ -1,10 +1,10 @@
 # django-bootcamp-first-project
 
 ## Requirements
-Requirements are avilable in `requirement.txt` right now the only external requirement is `mysql-connector-python==8.3.0`. Also it is required to use `python 3.10` but it is advised to use `python 3.11`.
+Requirements are avilable in `requirement.txt`. Right now the only external requirement is `mysql-connector-python==8.3.0`. Also it is required to use `python=3.10` but it is advised to use `python=3.11`.
 
 ## Server Configuration
-Before running server you have to set your database connection, and also host and the port that server listen to in `config.ini`.
+Before running the server you have to set your database connection, and also host and the port that server listen to in `config.ini`.
 ```ini
 [server]
 host = localhost
@@ -23,7 +23,7 @@ location = default
 ```
 
 ## Creating Admin User
-Using `create_admin.py` you can create admin user. You have to use this script on the server machine to create the first admin user.
+Using `create_admin.py` you can create admin users. You have to use this script on the server machine to create the first admin user.
 ```
 python create_admin.py -h
 
@@ -55,7 +55,7 @@ List of accepted requests by the server can be found in the link below:
 [Request list](https://docs.google.com/spreadsheets/d/1hEW496VUH2yVqaGEIK5vBeTh-_lR9JziVvb1IQfMKnQ/edit?usp=sharing)
 
 ## About this
-This is a server and client implementation for a cinema ticket reservation system.
+This is a server and client implementation for a cinema reservation system.
 ### Design Patterns
 [Singleton design pattern](https://refactoring.guru/design-patterns/singleton/python/example) used for Database connection module, Log writing module and TCP Client module.
 ###

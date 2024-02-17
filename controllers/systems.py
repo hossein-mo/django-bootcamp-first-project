@@ -10,18 +10,25 @@ from loging.log import Log
 from models.base_models import UserRole
 from controllers.authorization import authorize
 from utils.utils import create_response
+from utils.caching import Cache, invalidate, memoize
 
+_show_list_cache_key = 'show_list'
+_movie_list_cache_key = 'movie_list'
+_theater_list_cache_key = 'theater_list'
+_subs_list_cache_key = 'subs_list'
+cache = Cache()
 
 class UserManagement:
     """class for user management operations like login, sign up, edit profile, changing password and etc
 
     Raises:
         Excs.AuthenticationFaild: if authentication failes
-    """    
+    """
+
     loging: Log
 
     @staticmethod
-    def login(data: dict):  
+    def login(data: dict):
         login_handler = uHandlers.LoginHandler()
         data = login_handler.handle(data)
         user = data["user"]
@@ -94,11 +101,11 @@ class UserManagement:
     @staticmethod
     def edit_profile(user: mod.User, data: dict):
         data["user"] = user
-        if "username" not in data:
+        if "username" not in data or not data['username']:
             data["username"] = user.username
-        if "email" not in data:
+        if "email" not in data or not data['email']:
             data["email"] = user.email
-        if "phone_number" not in data:
+        if "phone_number" not in data or not data['phone_number']:
             data["phone_number"] = user.phone_number
         username = user.username
         useremail = user.email
@@ -170,9 +177,9 @@ class UserManagement:
         return response
 
 
-class AccountManagement:  
-    """class for account management operations like adding accounts and transfering funds.
-    """   
+class AccountManagement:
+    """class for account management operations like adding accounts and transfering funds."""
+
     loging: Log
 
     @staticmethod
@@ -285,8 +292,8 @@ class AccountManagement:
 
 
 class CinemaManagement:
-    """class for cinema management operation like adding movies, adding theaters and adding shows.
-    """    
+    """class for cinema management operation like adding movies, adding theaters and adding shows."""
+
     loging: Log
 
     @staticmethod
@@ -303,6 +310,7 @@ class CinemaManagement:
         return response
 
     @staticmethod
+    @invalidate(cache, _movie_list_cache_key)
     @authorize(authorized_roles={UserRole.ADMIN, UserRole.STAFF})
     def add_movie(user: mod.User, data: dict) -> dict:
         handler = cHandlers.CheckMovieInfo()
@@ -319,6 +327,7 @@ class CinemaManagement:
         return response
 
     @staticmethod
+    @invalidate(cache, _theater_list_cache_key)
     @authorize(authorized_roles={UserRole.ADMIN})
     def add_theater(user: mod.User, data: dict) -> dict:
         handler = cHandlers.CheckTheaterInfo()
@@ -335,6 +344,7 @@ class CinemaManagement:
         return response
 
     @staticmethod
+    @invalidate(cache, _show_list_cache_key)
     @authorize(authorized_roles={UserRole.ADMIN, UserRole.STAFF})
     def add_show(user: mod.User, data: dict):
         handler = cHandlers.CheckTheater()
@@ -386,18 +396,21 @@ class Reports:
 
     @staticmethod
     @authorize(authorized_roles={UserRole.ADMIN, UserRole.STAFF})
+    @memoize(cache, _theater_list_cache_key, ttl=3000)
     def get_theaters(user: mod.User):
         data = mod.Theater.get_theater_list()
         response = create_response(True, "report", "List of theaters!", data=data)
         return response
 
     @staticmethod
+    @memoize(cache, _movie_list_cache_key)
     def get_movies(user: mod.User):
         data = mod.Movie.get_movies_list()
         response = create_response(True, "report", "List of movies!", data=data)
         return response
 
     @staticmethod
+    @memoize(cache, _show_list_cache_key)
     def get_shows(user: mod.User):
         data = mod.Showtime.get_shows_list()
         response = create_response(True, "report", "List of shows!", data=data)
@@ -407,7 +420,7 @@ class Reports:
     def get_commetns(user: mod.User, data: dict):
         comms = mod.Comment.get_comments(data["movie_id"])
         response = create_response(
-            True, "report", "List of shows!", data={"commetns": comms}
+            True, "report", "List of movie comments!", data={"comments": comms}
         )
         return response
 
@@ -424,9 +437,10 @@ class Reports:
         return response
 
     @staticmethod
+    @memoize(cache, _subs_list_cache_key, ttl=86400)
     def get_subs(user: mod.User):
         subs = mod.Subscription.fetch()
-        response = create_response(True, "report", "List of reserved seats!", data=subs)
+        response = create_response(True, "report", "List of subscription plans!", data=subs)
         return response
 
     @staticmethod
@@ -437,8 +451,8 @@ class Reports:
 
 
 class Review:
-    """class for review related operations like rating movies and theaters, and writing comments.
-    """
+    """class for review related operations like rating movies and theaters, and writing comments."""
+
     loging: Log
 
     @staticmethod
@@ -492,8 +506,8 @@ class Review:
 
 
 class OrderManagement:
-    """class for buy and cancel operations like seat reservation and cancelation and buying subscriptions
-    """    
+    """class for buy and cancel operations like seat reservation and cancelation and buying subscriptions"""
+
     loging: Log
 
     @staticmethod
@@ -519,10 +533,9 @@ class OrderManagement:
         data["user"] = user
         handler = oHandlers.SubCheck()
         balance_check = baHandlers.BalanceCheck()
-        transf = baHandlers.TransferHandler()
         buy_sub = oHandlers.BuySub()
         inovice = oHandlers.CreateSubInovice()
-        handler.set_next(balance_check).set_next(transf).set_next(buy_sub).set_next(
+        handler.set_next(balance_check).set_next(buy_sub).set_next(
             inovice
         )
         try:
@@ -539,27 +552,30 @@ class OrderManagement:
 
     def ticket_pre_invoice(user: mod.User, data: dict) -> dict:
         data["user"] = user
-        handler = oHandlers.CalculateDiscountedPrice()
+        handler = oHandlers.ShowtimeCheck()
+        discount = oHandlers.CalculateDiscountedPrice()
+        handler.set_next(discount)
         try:
             data = handler.handle(data)
+            response = create_response(True, "invoice", "", data=data["pre_invoice"])
         except Excs.NotFound as err:
             response = create_response(False, "invoice", err.message)
-        response = create_response(True, "invoice", "", data=data["pre_invoice"])
         return response
 
     def reserve_seat(user: mod.User, data: dict) -> dict:
         data["user"] = user
         data["dest"] = "withdraw"
         data["origin"] = user
-        handler = oHandlers.CalculateDiscountedPrice()
+        handler = oHandlers.ShowtimeCheck()
+        discount = oHandlers.CalculateDiscountedPrice()
         seat_check = oHandlers.SeatCheck()
         balance_check = baHandlers.BalanceCheck()
         transf = baHandlers.TransferHandler()
         reserve = oHandlers.ReserveSeat()
         invoice = oHandlers.CreateOrderInovice()
-        handler.set_next(seat_check).set_next(balance_check).set_next(transf).set_next(
-            reserve
-        ).set_next(invoice)
+        handler.set_next(discount).set_next(seat_check).set_next(
+            balance_check
+        ).set_next(transf).set_next(reserve).set_next(invoice)
         try:
             data = handler.handle(data)
             order = data["order"]

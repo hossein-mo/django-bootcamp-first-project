@@ -14,7 +14,6 @@ class LoginPage(Page):
     def handle_response(self, response):
         client = TCPClient()
         if response is not None:
-            response = Response(**response)
             if response.status:
                 user = User(**response.data)
                 self.app.navigate_to_page(ProfilePage(self.app, user))
